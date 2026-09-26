@@ -1,1 +1,3 @@
-kiwipiepy>=0.23,<0.24
+requests
+python-dotenv
+kiwipiepy
