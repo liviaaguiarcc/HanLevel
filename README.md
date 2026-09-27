@@ -35,6 +35,27 @@ The goal is simple:
 **Try HanLevel:**  
 https://hanlevel.streamlit.app/
 
+## 🌷 HanLevel in action
+
+<div align="center">
+
+### Paste a Korean text
+
+<img src="images/hanlevel-home.png" width="850" alt="HanLevel home interface">
+
+<br><br>
+
+### Get an interpretable readability estimate
+
+<img src="images/hanlevel-result.png" width="850" alt="HanLevel readability result">
+
+<br><br>
+
+### Explore the linguistic analysis
+
+<img src="images/hanlevel-details.png" width="850" alt="HanLevel detailed analysis">
+
+</div>
 ---
 
 ## 💗 Why HanLevel?
