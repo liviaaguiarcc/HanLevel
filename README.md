@@ -445,7 +445,7 @@ The project explores how relatively simple and transparent NLP methods can creat
 
 ## 🩷 Author
 
-Developed by **Lívia Aguiar Cavalcanti**
+Developed by **Lívia Aguiar C. Cavalcanti**
 
 Background and interests:
 
