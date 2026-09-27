@@ -14,18 +14,18 @@ GRADE_SCORES  = {
 
 # Kiwi POS → Korean Learners' Dictionary POS code
 KIWI_TO_KRDICT_POS = {
-    "NNG": 1,   # common noun → 명사
-    "NNB": 11,  # dependent noun → 의존 명사
-    "NP": 2,    # pronoun → 대명사
-    "NR": 3,    # numeral → 수사
+    "NNG": "명사",
+    "NNB": "의존 명사",
+    "NP": "대명사",
+    "NR": "수사",
 
-    "VV": 5,    # verb → 동사
-    "VA": 6,    # adjective → 형용사
+    "VV": "동사",
+    "VA": "형용사",
 
-    "MM": 7,    # determiner → 관형사
-    "MAG": 8,   # adverb → 부사
-    "MAJ": 8,   # conjunctive adverb → 부사
-    "IC": 9,    # interjection → 감탄사
+    "MM": "관형사",
+    "MAG": "부사",
+    "MAJ": "부사",
+    "IC": "감탄사",
 }
 
 # Convert Kiwi output into kr dictionary citation forms.
@@ -283,7 +283,7 @@ def analyze_sentence_length(text):
 def classify_level(final_score):
     if final_score < 25:
         return "Beginner"
-    elif final_score < 55:
+    elif final_score < 50:
         return "Intermediate"
     else:
         return "Advanced"
@@ -390,50 +390,50 @@ if __name__ == "__main__":
     )
 
     print("\n========================")
-print("SENTENCE LENGTH")
-print("========================\n")
+    print("SENTENCE LENGTH")
+    print("========================\n")
 
-length = analyze_sentence_length(text)
+    length = analyze_sentence_length(text)
 
-print(
-    f"Average eojeol per sentence: "
-    f"{length['average_eojeol']:.2f}"
-)
+    print(
+        f"Average eojeol per sentence: "
+        f"{length['average_eojeol']:.2f}"
+    )
 
-print(
-    f"Sentence length score: "
-    f"{length['sentence_length_score']:.1f} / 100"
-)
+    print(
+     f"Sentence length score: "
+     f"{length['sentence_length_score']:.1f} / 100"
+    )
 
-print("\n========================")
-print("HANLEVEL RESULT")
-print("========================\n")
+    print("\n========================")
+    print("HANLEVEL RESULT")
+    print("========================\n")
 
-result = analyze_text(text)
+    result = analyze_text(text)
 
-print(
-    f"Vocabulary: "
-    f"{result['vocabulary']['vocabulary_score']:.1f} / 100"
-)
+    print(
+        f"Vocabulary: "
+        f"{result['vocabulary']['vocabulary_score']:.1f} / 100"
+    )
 
-print(
-    f"Grammar: "
-    f"{result['grammar']['grammar_score']:.1f} / 100"
-)
+    print(
+        f"Grammar: "
+        f"{result['grammar']['grammar_score']:.1f} / 100"
+    )
 
-print(
-    f"Sentence length: "
-    f"{result['sentence_length']['sentence_length_score']:.1f} / 100"
-)
+    print(
+        f"Sentence length: "
+        f"{result['sentence_length']['sentence_length_score']:.1f} / 100"
+    )
 
-print("\n------------------------")
+    print("\n------------------------")
 
-print(
-    f"Final HanLevel score: "
-    f"{result['final_score']:.1f} / 100"
-)
+    print(
+        f"Final HanLevel score: "
+        f"{result['final_score']:.1f} / 100"
+    )
 
-print(
-    f"Estimated level: "
-    f"{result['level']}"
-)
+    print(
+        f"Estimated level: "
+        f"{result['level']}"
+    )
