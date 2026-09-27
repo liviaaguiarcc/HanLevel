@@ -41,23 +41,38 @@ def extract_vocabulary(text):
     tokens = kiwi.tokenize(text)
     vocabulary = []
 
+    coverage_only_tags = {
+        "NNP",
+        "SL",
+    }
+
     for token in tokens:
         tag = token.tag
 
-        if tag == "NNP":
-            continue
-        if tag not in KIWI_TO_KRDICT_POS:
-            continue
+        if tag in KIWI_TO_KRDICT_POS:
+            lemma = normalize_lemma(
+                token.form,
+                tag
+            )
 
-        lemma = normalize_lemma(token.form, tag)
+            vocabulary.append(
+                {
+                    "lemma": lemma,
+                    "kiwi_pos": tag,
+                    "krdict_pos": KIWI_TO_KRDICT_POS[tag],
+                    "scorable": True,
+                }
+            )
 
-        vocabulary.append(
-            {
-                "lemma": lemma,
-                "kiwi_pos":tag,
-                "krdict_pos": KIWI_TO_KRDICT_POS[tag],
-            }
-        )
+        elif tag in coverage_only_tags:
+            vocabulary.append(
+                {
+                    "lemma": token.form,
+                    "kiwi_pos": tag,
+                    "krdict_pos": None,
+                    "scorable": False,
+                }
+            )
 
     return vocabulary
 
@@ -84,12 +99,16 @@ def analyze_vocabulary(text):
     analyzed_words = []
 
     for item in vocabulary:
-        results = lookup_word(
-            item["lemma"],
-            item["krdict_pos"]
-        )
+        if item["scorable"]:
+            results = lookup_word(
+                item["lemma"],
+                item["krdict_pos"]
+            )
 
-        grade = choose_grade(results)
+            grade = choose_grade(results)
+
+        else:
+            grade = None
 
         analyzed_words.append(
             {
@@ -101,6 +120,7 @@ def analyze_vocabulary(text):
                     if grade is not None
                     else None
                 ),
+                "scorable": item["scorable"],
             }
         )
 
@@ -295,14 +315,34 @@ def analyze_text(text):
     sentence_length = analyze_sentence_length(text)
 
     vocabulary_score = vocabulary["vocabulary_score"]
+    grammar_score = grammar["grammar_score"]
+    sentence_score = sentence_length["sentence_length_score"]
 
-    if vocabulary_score is None:
-        vocabulary_score = 0.0
+    weighted_scores = []
+    available_weights = []
+
+    # Vocabulary — 45%
+    if vocabulary_score is not None:
+        weighted_scores.append(
+            vocabulary_score * 0.45
+        )
+        available_weights.append(0.45)
+
+    # Grammar — 35%
+    weighted_scores.append(
+        grammar_score * 0.35
+    )
+    available_weights.append(0.35)
+
+    # Sentence length — 20%
+    weighted_scores.append(
+        sentence_score * 0.20
+    )
+    available_weights.append(0.20)
 
     final_score = (
-        vocabulary_score * 0.45
-        + grammar["grammar_score"] * 0.35
-        + sentence_length["sentence_length_score"] * 0.20
+        sum(weighted_scores)
+        / sum(available_weights)
     )
 
     level = classify_level(final_score)
