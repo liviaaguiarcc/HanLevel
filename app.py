@@ -1045,12 +1045,29 @@ if st.session_state.adaptation_result is not None:
     st.markdown("---")
     st.subheader("③ Compare")
 
-    st.text_area(
-        "Adapted Korean text",
-        value=adapted_text,
-        height=190,
-        disabled=True,
+    st.write(
+        "Compare the original and adapted versions side by side."
     )
+
+    original_col, adapted_col = st.columns(2)
+
+    with original_col:
+        st.text_area(
+            "Original text",
+            value=adaptation_result["original_text"],
+            height=220,
+            disabled=True,
+            key="compare_original_text",
+        )
+
+    with adapted_col:
+        st.text_area(
+            "Adapted text",
+            value=adapted_text,
+            height=220,
+            disabled=True,
+            key="compare_adapted_text",
+        )
 
     if adaptation_result["target_reached"]:
         attempt_count = adaptation_result["attempt_count"]
