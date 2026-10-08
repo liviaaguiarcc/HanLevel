@@ -1,5 +1,7 @@
 import os
 
+from html import escape
+
 import streamlit as st
 
 from analyzer import analyze_text
@@ -795,6 +797,45 @@ hr {
     margin-top: 0.4rem;
 }
 
+
+/* HanLevel v1: focused reading workspace */
+:root { --hl-ink: #252044; --hl-purple: #6046bd; }
+.stApp { background: #f5f5fb; color: var(--hl-ink); }
+.block-container { max-width: 1040px; padding-top: 2rem; padding-bottom: 3rem; }
+.workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: 1.25rem; margin-bottom: 1.5rem; border-bottom: 1px solid #dddbea; }
+.brand { font-size: 1.75rem; font-weight: 800; letter-spacing: -.04em; color: #392778; }
+.version-label { margin-left: .75rem; padding: .25rem .5rem; background: #e7e1fa; color: #4f3997; border-radius: .4rem; font-size: .875rem; }
+.workspace-header p { margin: 0; font-size: 1rem; color: #625d78; }
+.stTextArea textarea { font-size: 1.0625rem; line-height: 1.8; border-radius: 12px; border: 1px solid #ccc6df; }
+.stButton > button { background: white; color: #46336f; border: 1px solid #d5cee7; border-radius: 10px; min-height: 3rem; height: auto; padding: .65rem 1rem; }
+.stButton > button:hover { background: #eee9fa; color: #392778; border: 1px solid #a593d2; transform: none; }
+button[kind="primary"], .stFormSubmitButton button { background: #6046bd; color: white; border-radius: 10px; }
+button[kind="primary"]:hover, .stFormSubmitButton button:hover { background: #5036a8; color: white; }
+button:focus-visible, a:focus-visible { outline: 3px solid #8a74d3; outline-offset: 3px; }
+.level-card { text-align: left; padding: 1.25rem 1.5rem; border-radius: 14px; box-shadow: none; background: white; border: 1px solid #dddbea; }
+.level-kicker { font-size: .875rem; color: #655d7e; }
+.level-name { font-size: 2rem; }
+.difficulty-wrapper { padding: 1.5rem .85rem 0; margin: 1rem 0 1.5rem; }
+.difficulty-labels { font-size: .875rem; }
+.reason-box { border-radius: 12px; background: #ede8fa; color: #392e5a; padding: 1.2rem; line-height: 1.7; }
+[data-testid="stMetric"] { background: white; border: 1px solid #dddbea; border-radius: 12px; padding: 1rem; }
+[data-testid="stMetricValue"] { font-size: 1.6rem; }
+.tutor-shell { box-shadow: none; border-radius: 14px; background: #eee9fa; padding: 1.25rem; }
+.tutor-title { color: #392778; }
+.tutor-subtitle { font-size: 1rem; line-height: 1.6; }
+.typing-indicator { display: flex; align-items: center; gap: .4rem; width: max-content; max-width: 100%; }
+.tutor-thinking-label { white-space: nowrap; word-break: normal; flex-shrink: 0; font-size: .875rem; }
+@media (max-width: 640px) {
+ .block-container { padding: 1rem 1rem 2rem; }
+ .workspace-header { align-items: flex-start; flex-direction: column; gap: .5rem; }
+ .level-name { font-size: 1.75rem; }
+ [data-testid="stMetricValue"] { font-size: 1.4rem; }
+ .tutor-header { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+ *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -1380,60 +1421,14 @@ def get_unique_grammar_structures(
 # HERO
 # =========================================================
 
-hero_html = (
-    '<div class="hero-card">'
-
-        '<div class="hero-content">'
-
-            '<div class="hero-badge">'
-                'Korean Readability Profiler · AI Tutor'
-            '</div>'
-
-            '<div class="hero-title">'
-                'HanLevel'
-            '</div>'
-
-            '<div class="hero-description">'
-
-                '<span class="hero-highlight">'
-                    'Know if a Korean text is right for your level'
-                '</span>'
-
-                ' — and understand why. '
-
-                'HanLevel analyzes vocabulary, grammar, '
-                'and sentence length to estimate how challenging '
-                'a Korean text may be.'
-
-            '</div>'
-
-            '<div class="hero-chips">'
-
-                '<span class="hero-chip">'
-                    'Vocabulary · 45%'
-                '</span>'
-
-                '<span class="hero-chip">'
-                    'Grammar · 35%'
-                '</span>'
-
-                '<span class="hero-chip">'
-                    'Sentence length · 20%'
-                '</span>'
-
-            '</div>'
-
-        '</div>'
-
-    '</div>'
-)
-
-
 st.markdown(
-    hero_html,
+    '<div class="workspace-header"><div><span class="brand">HanLevel</span>'
+    '<span class="version-label">v1.0</span></div>'
+    '<p>Korean readability, explained.</p></div>',
     unsafe_allow_html=True,
 )
-
+st.subheader("Explore a Korean text")
+st.caption("Paste a passage to understand its difficulty, then explore it with your tutor.")
 
 # =========================================================
 # INPUT
@@ -1442,7 +1437,8 @@ st.markdown(
 text = st.text_area(
     "Korean text",
 
-    height=180,
+    height=220,
+    key="reading_input",
 
     placeholder=(
         "예: 오늘은 날씨가 정말 좋네요. "
@@ -1484,9 +1480,12 @@ if analyze_button:
         st.session_state.source_text = analyzed_text
         st.session_state.source_analysis = analyzed_result
         st.session_state.tutor_history = []
+        st.session_state.pending_tutor_question = None
 
 
 if st.session_state.source_analysis is not None:
+    if text.strip() != st.session_state.source_text:
+        st.info("Your text has changed. Analyze it again to update the results and tutor context.")
 
     text = st.session_state.source_text
     result = st.session_state.source_analysis
@@ -1698,7 +1697,7 @@ if st.session_state.source_analysis is not None:
 
         f'<br>'
 
-        f'{explanation}'
+        f'{escape(explanation)}'
 
         f'</div>'
     )
@@ -1776,56 +1775,57 @@ if st.session_state.source_analysis is not None:
     # CONTRIBUTION BREAKDOWN
     # =================================================
 
-    st.markdown(
-        "#### Contribution to HanLevel score"
-    )
-
-
-    contribution_columns = (
-        st.columns(3)
-    )
-
-
-    with contribution_columns[0]:
-
-        st.metric(
-            "Vocabulary",
-            (
-                f"+"
-                f"{contributions.get('Vocabulary', 0):.1f}"
-                f" points"
-            ),
+    with st.expander("How each indicator contributes to your score"):
+        st.markdown(
+            "#### Contribution to HanLevel score"
         )
 
 
-    with contribution_columns[1]:
-
-        st.metric(
-            "Grammar",
-            (
-                f"+"
-                f"{contributions.get('Grammar', 0):.1f}"
-                f" points"
-            ),
+        contribution_columns = (
+            st.columns(3)
         )
 
 
-    with contribution_columns[2]:
+        with contribution_columns[0]:
 
-        st.metric(
-            "Sentence length",
-            (
-                f"+"
-                f"{contributions.get('Sentence length', 0):.1f}"
-                f" points"
-            ),
+            st.metric(
+                "Vocabulary",
+                (
+                    f"+"
+                    f"{contributions.get('Vocabulary', 0):.1f}"
+                    f" points"
+                ),
+            )
+
+
+        with contribution_columns[1]:
+
+            st.metric(
+                "Grammar",
+                (
+                    f"+"
+                    f"{contributions.get('Grammar', 0):.1f}"
+                    f" points"
+                ),
+            )
+
+
+        with contribution_columns[2]:
+
+            st.metric(
+                "Sentence length",
+                (
+                    f"+"
+                    f"{contributions.get('Sentence length', 0):.1f}"
+                    f" points"
+                ),
+            )
+
+
+        st.caption(
+            "Weighted contributions add up "
+            "to the final HanLevel score."
         )
-
-
-    st.caption(
-        "Weighted contributions add up "
-        "to the final HanLevel score."
-    )
 
 
     # =================================================
@@ -2032,7 +2032,7 @@ Current provisional thresholds are:
 
 These thresholds were calibrated on a small internally constructed development set. They are not official TOPIK or CEFR boundaries.
 
-HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate transparent and inspectable.
+HanLevel uses a rule-based model designed to make its difficulty estimate transparent and inspectable.
 """
         )
 
@@ -2067,7 +2067,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
     if gemini_api_key is None:
         st.info(
             "The readability analysis works without AI, but the tutor needs "
-            "GEMINI_API_KEY configured in this deployment."
+            "a connection that is currently unavailable. Please try again later."
         )
 
     suggested_questions = [
@@ -2182,7 +2182,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
             )
 
         for turn_index, turn in enumerate(
-            reversed(turns)
+            turns
         ):
 
             for message in turn:
@@ -2196,7 +2196,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
             if (
                 pending_question
-                and turn_index == 0
+                and turn_index == len(turns) - 1
                 and turn[-1]["role"] == "user"
             ):
 
@@ -2281,10 +2281,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                     error_answer
                 )
 
-            with st.expander(
-                "Technical details"
-            ):
-                st.code(str(exc))
+            # Keep service errors out of the learner-facing conversation.
 
         else:
 
