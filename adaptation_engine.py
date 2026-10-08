@@ -34,6 +34,7 @@ class AdaptationAttempt:
     change_summary: list[str]
     notable_changes: list[dict[str, Any]]
     model: str
+    latency_seconds: float = 0.0
 
     @property
     def score(self) -> float:
@@ -263,6 +264,7 @@ def _run_attempt(
         change_summary=generated.get("change_summary", []),
         notable_changes=generated.get("notable_changes", []),
         model=generated["model"],
+        latency_seconds=float(generated.get("latency_seconds", 0.0)),
     )
 
 
@@ -276,6 +278,7 @@ def _serialize_attempt(attempt: AdaptationAttempt) -> dict[str, Any]:
         "change_summary": attempt.change_summary,
         "notable_changes": attempt.notable_changes,
         "model": attempt.model,
+        "latency_seconds": attempt.latency_seconds,
     }
 
 
@@ -430,6 +433,7 @@ def retry_adaptation(
         change_summary=previous_result.get("change_summary", []),
         notable_changes=previous_result.get("notable_changes", []),
         model=previous_result.get("model", new_attempt.model),
+        latency_seconds=0.0,
     )
 
     best_attempt = _best_attempt(
