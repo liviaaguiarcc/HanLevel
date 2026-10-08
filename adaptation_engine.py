@@ -91,6 +91,37 @@ def _format_feedback(
     sentence_score = analysis["sentence_length"]["sentence_length_score"]
     avg_eojeol = analysis["sentence_length"]["average_eojeol"]
 
+    # Mirror HanLevel's actual weighting so the corrective prompt attacks the
+    # component that is contributing the most to the current score.
+    contributions = {
+        "Grammar": grammar_score * 0.35,
+        "Sentence length": sentence_score * 0.20,
+    }
+
+    if vocab_score is not None:
+        contributions["Vocabulary"] = vocab_score * 0.45
+
+    strongest_component = max(contributions, key=contributions.get)
+
+    if strongest_component == "Vocabulary":
+        blocker_advice = (
+            "The largest weighted blocker is VOCABULARY. Replace or paraphrase "
+            "the listed intermediate/advanced lexical items with common words "
+            "or simple explanatory phrases. Preserve the concept, not the "
+            "original difficult term."
+        )
+    elif strongest_component == "Grammar":
+        blocker_advice = (
+            "The largest weighted blocker is GRAMMAR. Break embedded clauses "
+            "into independent sentences, reduce nominalization and adnominal "
+            "chains, and prefer direct predicate structures."
+        )
+    else:
+        blocker_advice = (
+            "The largest weighted blocker is SENTENCE LENGTH. Split long "
+            "sentences aggressively while preserving every proposition."
+        )
+
     challenging_words = []
     seen_words = set()
 
@@ -185,7 +216,9 @@ def _format_feedback(
         f"- Vocabulary difficulty: {vocab_text}\n"
         f"- Grammar complexity: {grammar_score:.1f}/100\n"
         f"- Sentence-length difficulty: {sentence_score:.1f}/100\n"
-        f"- Average eojeol per sentence: {avg_eojeol:.1f}"
+        f"- Average eojeol per sentence: {avg_eojeol:.1f}\n"
+        f"- Strongest weighted blocker: {strongest_component}\n"
+        f"- Priority action: {blocker_advice}"
         f"{vocab_block}{structure_block}\n"
         f"The requested target is {target_level}, which requires a score "
         f"{target_text}. {directional_advice} Preserve the original meaning, "
