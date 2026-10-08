@@ -1126,10 +1126,24 @@ if st.session_state.adaptation_result is not None:
                     if attempt["level"] == adaptation_result["target_level"]
                     else "→"
                 )
+                analysis = attempt["analysis"]
+                vocab = safe_score(
+                    analysis["vocabulary"]["vocabulary_score"]
+                )
+                grammar = analysis["grammar"]["grammar_score"]
+                sentence = (
+                    analysis["sentence_length"]["sentence_length_score"]
+                )
+
                 st.write(
                     f"**Attempt {attempt['number']}** {status} "
                     f"{attempt['level']} · {attempt['score']:.1f}/100 "
                     f"· {attempt.get('model', 'Gemini')}"
+                )
+                st.caption(
+                    f"Vocabulary {vocab:.1f} · "
+                    f"Grammar {grammar:.1f} · "
+                    f"Sentence length {sentence:.1f}"
                 )
 
     render_what_changed(adaptation_result)
