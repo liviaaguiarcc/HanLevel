@@ -1073,8 +1073,9 @@ if st.session_state.adaptation_result is not None:
                 Target not reached after
                 {adaptation_result['attempt_count']} attempts.
                 Requested: {adaptation_result['target_level']}.
-                Current result: {adapted_result['level']}
-                ({adapted_result['final_score']:.1f}/100).
+                Best result so far: {adapted_result['level']}
+                ({adapted_result['final_score']:.1f}/100),
+                from attempt {adaptation_result.get('best_attempt_number', adaptation_result['attempt_count'])}.
             </div>
             """,
             unsafe_allow_html=True,
@@ -1115,6 +1116,21 @@ if st.session_state.adaptation_result is not None:
         mime="text/plain",
         use_container_width=True,
     )
+
+    attempts = adaptation_result.get("attempts", [])
+    if attempts:
+        with st.expander("See adaptation attempts"):
+            for attempt in attempts:
+                status = (
+                    "✓ target"
+                    if attempt["level"] == adaptation_result["target_level"]
+                    else "→"
+                )
+                st.write(
+                    f"**Attempt {attempt['number']}** {status} "
+                    f"{attempt['level']} · {attempt['score']:.1f}/100 "
+                    f"· {attempt.get('model', 'Gemini')}"
+                )
 
     render_what_changed(adaptation_result)
 
