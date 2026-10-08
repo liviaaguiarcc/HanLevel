@@ -705,6 +705,48 @@ hr {
     border-radius: 16px;
 }
 
+.typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 2px 0;
+}
+
+.typing-indicator span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #786ed7;
+    opacity: 0.35;
+    animation: hanlevelTyping 1.15s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: 0.16s;
+}
+
+.typing-indicator span:nth-child(3) {
+    animation-delay: 0.32s;
+}
+
+@keyframes hanlevelTyping {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.35;
+    }
+    30% {
+        transform: translateY(-4px);
+        opacity: 1;
+    }
+}
+
+.tutor-thinking-label {
+    margin-left: 8px;
+    color: #7a8296;
+    font-size: 0.84rem;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -1910,9 +1952,8 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                     <div class="tutor-title">Ask HanLevel Tutor</div>
                     <div class="tutor-subtitle">
                         Ask about meaning, vocabulary, grammar, or how this
-                        Korean could be expressed differently. HanLevel Tutor
-                        keeps the conversation focused on the text and its
-                        analysis :)
+                        Korean could be expressed differently. I'm here to
+                        explore the text with you ^^
                     </div>
                 </div>
             </div>
@@ -1936,7 +1977,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
         ),
         (
             f"Why is this {result['level']}?",
-            "Why did HanLevel classify this text at this level? "
+            "Why did we classify this text at this level? "
             "Use the analysis to explain the main reasons.",
         ),
         (
@@ -1978,24 +2019,6 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
             ):
                 selected_question = question
 
-    if st.session_state.tutor_history:
-
-        st.markdown("#### Conversation")
-        st.caption(
-            "The conversation stays inside this box, so the page does not "
-            "keep getting longer. Scroll to review earlier messages."
-        )
-
-        with st.container(
-            height=360,
-            border=True,
-        ):
-
-            for message in st.session_state.tutor_history:
-
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
-
     with st.form(
         "tutor_question_form",
         clear_on_submit=True,
@@ -2021,11 +2044,11 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
     if ask_button and custom_question.strip():
         pending_question = custom_question.strip()
 
-    if pending_question:
+    prior_history = list(
+        st.session_state.tutor_history
+    )
 
-        prior_history = list(
-            st.session_state.tutor_history
-        )
+    if pending_question:
 
         st.session_state.tutor_history.append(
             {
@@ -2034,46 +2057,141 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
             }
         )
 
-        with st.spinner(
-            "HanLevel Tutor is reading the analysis..."
-        ):
+    def build_turns(history):
 
-            try:
-                tutor_result = ask_tutor(
-                    text=st.session_state.source_text,
-                    analysis=st.session_state.source_analysis,
-                    question=pending_question,
-                    history=prior_history,
-                    api_key=gemini_api_key,
-                )
+        turns = []
+        current_turn = []
 
-            except Exception as exc:
+        for message in history:
 
-                st.session_state.tutor_history.pop()
+            if (
+                message["role"] == "user"
+                and current_turn
+            ):
+                turns.append(current_turn)
+                current_turn = []
 
-                st.error(
-                    "The tutor could not answer right now. "
-                    "Please try again in a moment."
-                )
+            current_turn.append(message)
 
-                with st.expander(
-                    "Technical details"
+        if current_turn:
+            turns.append(current_turn)
+
+        return turns
+
+    if st.session_state.tutor_history:
+
+        st.markdown("#### Conversation")
+        st.caption(
+            "Newest exchange first · scroll inside the box for earlier messages."
+        )
+
+        chat_box = st.container(
+            height=380,
+            border=True,
+        )
+
+        with chat_box:
+
+            turns = build_turns(
+                st.session_state.tutor_history
+            )
+
+            # Newest turn first means a fresh tutor answer opens at its
+            # beginning instead of leaving the user at the bottom of it.
+            for turn_index, turn in enumerate(
+                reversed(turns)
+            ):
+
+                for message in turn:
+
+                    with st.chat_message(
+                        message["role"]
+                    ):
+                        st.markdown(
+                            message["content"]
+                        )
+
+                if (
+                    pending_question
+                    and turn_index == 0
+                    and turn[-1]["role"] == "user"
                 ):
-                    st.code(str(exc))
 
-            else:
+                    with st.chat_message(
+                        "assistant"
+                    ):
 
-                st.session_state.tutor_history.append(
-                    {
-                        "role": "assistant",
-                        "content": tutor_result["answer"],
-                    }
+                        typing_placeholder = st.empty()
+
+                        typing_placeholder.markdown(
+                            """
+                            <div class="typing-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                                <span class="tutor-thinking-label">
+                                    thinking...
+                                </span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                if turn_index < len(turns) - 1:
+                    st.divider()
+
+    if pending_question:
+
+        try:
+            tutor_result = ask_tutor(
+                text=st.session_state.source_text,
+                analysis=st.session_state.source_analysis,
+                question=pending_question,
+                history=prior_history,
+                api_key=gemini_api_key,
+            )
+
+        except Exception as exc:
+
+            error_answer = (
+                "I couldn't finish that answer just now. "
+                "Try me again in a moment? ^^"
+            )
+
+            st.session_state.tutor_history.append(
+                {
+                    "role": "assistant",
+                    "content": error_answer,
+                }
+            )
+
+            if "typing_placeholder" in locals():
+                typing_placeholder.markdown(
+                    error_answer
                 )
 
-                # Keep enough context for a useful conversation without
-                # allowing the session to grow indefinitely.
-                st.session_state.tutor_history = (
-                    st.session_state.tutor_history[-20:]
+            with st.expander(
+                "Technical details"
+            ):
+                st.code(str(exc))
+
+        else:
+
+            answer = tutor_result["answer"]
+
+            st.session_state.tutor_history.append(
+                {
+                    "role": "assistant",
+                    "content": answer,
+                }
+            )
+
+            if "typing_placeholder" in locals():
+                typing_placeholder.markdown(
+                    answer
                 )
 
-                st.rerun()
+        # Keep recent context without letting a long study session grow forever.
+        st.session_state.tutor_history = (
+            st.session_state.tutor_history[-20:]
+        )
