@@ -1,2 +1,4 @@
 kiwipiepy
 streamlit
+google-genai
+pydantic
