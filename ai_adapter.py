@@ -20,19 +20,24 @@ VALID_STYLES = {"Natural", "Casual", "Learning-friendly"}
 
 LEVEL_GUIDANCE = {
     "Beginner": (
-        "Use common learner-friendly vocabulary, short and clear sentences, "
-        "and simple grammatical connections. Preserve essential information "
-        "instead of summarizing it away."
+        "Use very common learner-friendly vocabulary and short, direct "
+        "sentences. Prefer simple clause structures and explicit connections. "
+        "Avoid dense nominalization, long adnominal chains, abstract wording, "
+        "and unnecessarily complex connective endings. Preserve every "
+        "essential idea instead of summarizing it away. Aim comfortably inside "
+        "the Beginner band rather than barely crossing the threshold."
     ),
     "Intermediate": (
         "Use natural intermediate-level Korean with moderately varied "
         "vocabulary and grammar. Keep sentences readable while allowing "
-        "some connected and embedded structures."
+        "some connected and embedded structures. Aim for the middle of the "
+        "Intermediate band rather than near a boundary."
     ),
     "Advanced": (
         "Use natural Korean appropriate for proficient readers. Increase "
         "lexical and grammatical sophistication only when it sounds natural; "
-        "do not make the text artificially verbose or obscure."
+        "do not make the text artificially verbose or obscure. Aim clearly "
+        "inside the Advanced band rather than just above the threshold."
     ),
 }
 
