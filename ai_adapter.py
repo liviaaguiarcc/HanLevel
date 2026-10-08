@@ -5,6 +5,7 @@ scores every candidate, so generation and evaluation remain separate.
 """
 
 import os
+import time
 from typing import Literal
 
 from google import genai
@@ -13,7 +14,12 @@ from pydantic import BaseModel, Field
 
 
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-FALLBACK_MODELS = ("gemini-3.7-flash", "gemini-3.5-flash-lite")
+FALLBACK_MODELS = (
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+)
 
 VALID_LEVELS = {"Beginner", "Intermediate", "Advanced"}
 VALID_STYLES = {"Natural", "Casual", "Learning-friendly"}
@@ -345,34 +351,62 @@ def adapt_text(
     used_model = None
 
     for candidate_model in candidate_models:
-        try:
-            response = client.models.generate_content(
-                model=candidate_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    max_output_tokens=4096,
-                    response_mime_type="application/json",
-                    response_schema=AdaptationResponse,
-                    thinking_config=types.ThinkingConfig(
-                        thinking_level="medium",
+        # Give the stronger Flash models one brief second chance before
+        # degrading to a smaller fallback. This avoids immediately dropping
+        # to Flash-Lite during a short capacity spike.
+        tries = 2 if candidate_model in {
+            "gemini-3.8-flash",
+            "gemini-3.7-flash",
+        } else 1
+
+        for try_number in range(tries):
+            try:
+                response = client.models.generate_content(
+                    model=candidate_model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        max_output_tokens=4096,
+                        response_mime_type="application/json",
+                        response_schema=AdaptationResponse,
+                        thinking_config=types.ThinkingConfig(
+                            thinking_level="medium",
+                        ),
                     ),
-                ),
-            )
-            used_model = candidate_model
+                )
+                used_model = candidate_model
+                break
+
+            except Exception as exc:
+                error_text = str(exc)
+                lowered = error_text.lower()
+
+                is_fallback_error = (
+                    "503" in error_text
+                    or "unavailable" in lowered
+                    or "high demand" in lowered
+                    or "404" in error_text
+                    or "not_found" in lowered
+                    or "429" in error_text
+                    or "resource_exhausted" in lowered
+                )
+
+                if not is_fallback_error:
+                    raise
+
+                last_error = exc
+
+                if (
+                    try_number + 1 < tries
+                    and (
+                        "503" in error_text
+                        or "unavailable" in lowered
+                        or "high demand" in lowered
+                    )
+                ):
+                    time.sleep(1.5)
+
+        if response is not None:
             break
-
-        except Exception as exc:
-            error_text = str(exc)
-            is_capacity_error = (
-                "503" in error_text
-                or "UNAVAILABLE" in error_text
-                or "high demand" in error_text.lower()
-            )
-
-            if not is_capacity_error:
-                raise
-
-            last_error = exc
 
     if response is None:
         raise RuntimeError(
