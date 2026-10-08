@@ -754,6 +754,47 @@ hr {
     line-height: 1.2;
 }
 
+.tutor-dialog-pet-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 0.4rem 0 1rem 0;
+}
+
+.tutor-dialog-pet {
+    position: relative;
+    width: 76px;
+    height: 62px;
+    border-radius: 52% 48% 46% 54% / 58% 52% 48% 42%;
+    background: #7464c9;
+    box-shadow: 0 8px 22px rgba(85, 72, 160, 0.24);
+}
+
+.tutor-dialog-pet::before,
+.tutor-dialog-pet::after {
+    content: "";
+    position: absolute;
+    top: 21px;
+    width: 7px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffffff;
+}
+
+.tutor-dialog-pet::before {
+    left: 21px;
+}
+
+.tutor-dialog-pet::after {
+    right: 21px;
+}
+
+.feedback-note {
+    text-align: center;
+    color: #8a91a5;
+    font-size: 0.78rem;
+    margin-top: 0.4rem;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -815,6 +856,45 @@ def get_contact_email():
         return st.secrets["CONTACT_EMAIL"]
     except (KeyError, FileNotFoundError):
         return None
+
+
+@st.dialog("Tell Livia")
+def show_tutor_contact():
+
+    st.markdown(
+        """
+        <div class="tutor-dialog-pet-wrap">
+            <div class="tutor-dialog-pet"></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        **Hi ^^ I'm the HanLevel Tutor.**
+
+        This is my creator, **Livia**.
+
+        If I gave you an inaccurate explanation, hallucinated something,
+        or just acted a little weird, please tell her. It helps us make
+        this tutor better :)
+        """
+    )
+
+    contact_email = get_contact_email()
+
+    if contact_email:
+
+        st.markdown(
+            f"**Email Livia:** [{contact_email}](mailto:{contact_email})"
+        )
+
+    else:
+
+        st.caption(
+            "The private contact email has not been configured yet."
+        )
 
 
 # =========================================================
@@ -2039,6 +2119,9 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
             ):
                 selected_question = question
 
+    if "pending_tutor_question" not in st.session_state:
+        st.session_state.pending_tutor_question = None
+
     def build_turns(history):
 
         turns = []
@@ -2060,6 +2143,25 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
         return turns
 
+    if selected_question:
+        st.session_state.pending_tutor_question = selected_question
+
+    pending_question = st.session_state.pending_tutor_question
+    prior_history = list(
+        st.session_state.tutor_history
+    )
+
+    if pending_question:
+
+        st.session_state.pending_tutor_question = None
+
+        st.session_state.tutor_history.append(
+            {
+                "role": "user",
+                "content": pending_question,
+            }
+        )
+
     st.markdown("#### Conversation")
 
     chat_box = st.container(
@@ -2067,44 +2169,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
         border=True,
     )
 
-    pending_question = selected_question
-    prior_history = list(
-        st.session_state.tutor_history
-    )
-
     with chat_box:
-
-        with st.form(
-            "tutor_question_form",
-            clear_on_submit=True,
-        ):
-
-            custom_question = st.text_input(
-                "Ask me anything about this text",
-                placeholder=(
-                    "e.g. Why is -는데 used here? "
-                    "Is there an easier word for this?"
-                ),
-                disabled=(gemini_api_key is None),
-            )
-
-            ask_button = st.form_submit_button(
-                "Send",
-                use_container_width=True,
-                disabled=(gemini_api_key is None),
-            )
-
-        if ask_button and custom_question.strip():
-            pending_question = custom_question.strip()
-
-        if pending_question:
-
-            st.session_state.tutor_history.append(
-                {
-                    "role": "user",
-                    "content": pending_question,
-                }
-            )
 
         turns = build_turns(
             st.session_state.tutor_history
@@ -2112,7 +2177,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
         if not turns:
             st.caption(
-                "Pick a question above or type your own here. "
+                "Pick a question above or type your own below. "
                 "I'll stay focused on this text with you ^^"
             )
 
@@ -2155,6 +2220,36 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
             if turn_index < len(turns) - 1:
                 st.divider()
+
+        st.markdown("---")
+
+        with st.form(
+            "tutor_question_form",
+            clear_on_submit=True,
+        ):
+
+            custom_question = st.text_input(
+                "Ask me anything about this text",
+                placeholder=(
+                    "e.g. Why is -는데 used here? "
+                    "Is there an easier word for this?"
+                ),
+                disabled=(gemini_api_key is None),
+            )
+
+            ask_button = st.form_submit_button(
+                "Send",
+                use_container_width=True,
+                disabled=(gemini_api_key is None),
+            )
+
+        if ask_button and custom_question.strip():
+
+            st.session_state.pending_tutor_question = (
+                custom_question.strip()
+            )
+
+            st.rerun()
 
     if pending_question:
 
@@ -2213,34 +2308,21 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
     st.markdown("---")
 
-    st.caption(
-        "Found a problem, strange explanation, or possible AI hallucination? "
-        "Please tell us so we can improve the tutor."
+    note_col, action_col = st.columns(
+        [4.5, 1.5],
+        vertical_alignment="center",
     )
 
-    with st.popover(
-        "Contact the creator"
-    ):
-
-        st.markdown(
-            """
-            **Hi ^^ I'm the HanLevel Tutor.**
-
-            This is my creator, **Livia**. If I said something inaccurate,
-            confusing, or strange, please let her know :)
-            """
+    with note_col:
+        st.caption(
+            "Found something wrong with the tutor?"
         )
 
-        contact_email = get_contact_email()
-
-        if contact_email:
-
-            st.markdown(
-                f"**Email Livia:** [{contact_email}](mailto:{contact_email})"
-            )
-
-        else:
-
-            st.caption(
-                "Contact email is not configured yet."
-            )
+    with action_col:
+        if st.button(
+            "let us know",
+            key="open_tutor_feedback",
+            type="tertiary",
+            use_container_width=False,
+        ):
+            show_tutor_contact()
