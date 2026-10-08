@@ -5,7 +5,6 @@ scores every candidate, so generation and evaluation remain separate.
 """
 
 import os
-import time
 from typing import Literal
 
 from google import genai
@@ -351,13 +350,9 @@ def adapt_text(
     used_model = None
 
     for candidate_model in candidate_models:
-        # Give the stronger Flash models one brief second chance before
-        # degrading to a smaller fallback. This avoids immediately dropping
-        # to Flash-Lite during a short capacity spike.
-        tries = 2 if candidate_model in {
-            "gemini-3.8-flash",
-            "gemini-3.7-flash",
-        } else 1
+        # Prefer fast failover between models instead of waiting through a
+        # second capacity retry. This keeps the interactive app responsive.
+        tries = 1
 
         for try_number in range(tries):
             try:
@@ -369,7 +364,7 @@ def adapt_text(
                         response_mime_type="application/json",
                         response_schema=AdaptationResponse,
                         thinking_config=types.ThinkingConfig(
-                            thinking_level="medium",
+                            thinking_level="low",
                         ),
                     ),
                 )
@@ -394,16 +389,6 @@ def adapt_text(
                     raise
 
                 last_error = exc
-
-                if (
-                    try_number + 1 < tries
-                    and (
-                        "503" in error_text
-                        or "unavailable" in lowered
-                        or "high demand" in lowered
-                    )
-                ):
-                    time.sleep(1.5)
 
         if response is not None:
             break
