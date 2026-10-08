@@ -1152,10 +1152,17 @@ if st.session_state.adaptation_result is not None:
                     analysis["sentence_length"]["sentence_length_score"]
                 )
 
+                latency = float(attempt.get("latency_seconds", 0.0))
+                latency_text = (
+                    f" · {latency:.1f}s"
+                    if latency > 0
+                    else ""
+                )
+
                 st.write(
                     f"**Attempt {attempt['number']}** {status} "
                     f"{attempt['level']} · {attempt['score']:.1f}/100 "
-                    f"· {attempt.get('model', 'Gemini')}"
+                    f"· {attempt.get('model', 'Gemini')}{latency_text}"
                 )
                 st.caption(
                     f"Vocabulary {vocab:.1f} · "
