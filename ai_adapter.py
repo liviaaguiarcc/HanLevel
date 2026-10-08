@@ -5,6 +5,7 @@ scores every candidate, so generation and evaluation remain separate.
 """
 
 import os
+import time
 from typing import Literal
 
 from google import genai
@@ -12,13 +13,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-FALLBACK_MODELS = (
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-)
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 VALID_LEVELS = {"Beginner", "Intermediate", "Advanced"}
 VALID_STYLES = {"Natural", "Casual", "Learning-friendly"}
@@ -124,10 +119,13 @@ class AdaptationResponse(BaseModel):
         description="The complete adapted Korean text and nothing else."
     )
     change_summary: list[str] = Field(
-        description="Two or three concise explanations of the main changes."
+        min_length=1,
+        max_length=2,
+        description="One or two concise explanations of the main changes."
     )
     notable_changes: list[ChangeExample] = Field(
-        description="Concrete examples of vocabulary, grammar, sentence, or style changes."
+        max_length=2,
+        description="At most two concrete examples of important changes."
     )
 
 
@@ -168,7 +166,7 @@ def _diagnostic_items(analysis: dict) -> str:
         label = "Intermediate" if grade == "중급" else "Advanced"
         difficult_words.append(f"{word} ({label})")
 
-        if len(difficult_words) >= 16:
+        if len(difficult_words) >= 8:
             break
 
     structures = []
@@ -185,7 +183,7 @@ def _diagnostic_items(analysis: dict) -> str:
         seen_structures.add(key)
         structures.append(f"{form} ({tag})")
 
-        if len(structures) >= 16:
+        if len(structures) >= 8:
             break
 
     blocks = []
@@ -339,65 +337,27 @@ def adapt_text(
         attempt_number=attempt_number,
     )
 
-    candidate_models = [selected_model]
+    started_at = time.perf_counter()
 
-    for fallback_model in FALLBACK_MODELS:
-        if fallback_model not in candidate_models:
-            candidate_models.append(fallback_model)
-
-    last_error = None
-    response = None
-    used_model = None
-
-    for candidate_model in candidate_models:
-        # Prefer fast failover between models instead of waiting through a
-        # second capacity retry. This keeps the interactive app responsive.
-        tries = 1
-
-        for try_number in range(tries):
-            try:
-                response = client.models.generate_content(
-                    model=candidate_model,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        max_output_tokens=4096,
-                        response_mime_type="application/json",
-                        response_schema=AdaptationResponse,
-                        thinking_config=types.ThinkingConfig(
-                            thinking_level="low",
-                        ),
-                    ),
-                )
-                used_model = candidate_model
-                break
-
-            except Exception as exc:
-                error_text = str(exc)
-                lowered = error_text.lower()
-
-                is_fallback_error = (
-                    "503" in error_text
-                    or "unavailable" in lowered
-                    or "high demand" in lowered
-                    or "404" in error_text
-                    or "not_found" in lowered
-                    or "429" in error_text
-                    or "resource_exhausted" in lowered
-                )
-
-                if not is_fallback_error:
-                    raise
-
-                last_error = exc
-
-        if response is not None:
-            break
-
-    if response is None:
+    try:
+        response = client.models.generate_content(
+            model=selected_model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                max_output_tokens=1400,
+                response_mime_type="application/json",
+                response_schema=AdaptationResponse,
+                thinking_config=types.ThinkingConfig(
+                    thinking_level="low",
+                ),
+            ),
+        )
+    except Exception as exc:
         raise RuntimeError(
-            "Gemini is temporarily unavailable across the configured "
-            "fallback models. Please try again shortly."
-        ) from last_error
+            f"Gemini request failed with {selected_model}: {exc}"
+        ) from exc
+
+    latency_seconds = time.perf_counter() - started_at
 
     if not response.text:
         raise RuntimeError("Gemini returned an empty response.")
@@ -406,5 +366,6 @@ def adapt_text(
 
     return {
         **parsed.model_dump(),
-        "model": used_model,
+        "model": selected_model,
+        "latency_seconds": latency_seconds,
     }
