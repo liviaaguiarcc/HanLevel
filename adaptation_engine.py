@@ -50,8 +50,9 @@ def target_reached(analysis: dict[str, Any], target_level: str) -> bool:
 def _format_feedback(
     analysis: dict[str, Any],
     target_level: str,
+    previous_text: str | None = None,
 ) -> str:
-    """Create compact evaluator feedback for the corrective retry."""
+    """Create actionable evaluator feedback for the corrective retry."""
 
     vocab_score = analysis["vocabulary"]["vocabulary_score"]
     vocab_text = (
@@ -64,13 +65,79 @@ def _format_feedback(
     sentence_score = analysis["sentence_length"]["sentence_length_score"]
     avg_eojeol = analysis["sentence_length"]["average_eojeol"]
 
-    lower, upper = TARGET_BANDS[target_level]
+    challenging_words = []
+    seen_words = set()
+    for item in analysis["vocabulary"]["words"]:
+        if item.get("grade") not in {"중급", "고급"}:
+            continue
+        word = item.get("word")
+        if not word or word in seen_words:
+            continue
+        seen_words.add(word)
+        challenging_words.append(word)
+        if len(challenging_words) >= 12:
+            break
+
+    structures = []
+    seen_structures = set()
+    for item in analysis["grammar"]["structures"]:
+        form = item.get("form")
+        tag = item.get("tag")
+        key = (form, tag)
+        if not form or key in seen_structures:
+            continue
+        seen_structures.add(key)
+        structures.append(f"{form} ({tag})")
+        if len(structures) >= 12:
+            break
+
     if target_level == "Beginner":
-        target_text = "below 25"
+        target_text = (
+            "below 25; aim for 20 or lower to leave a safety margin"
+        )
+        directional_advice = (
+            "Use substantially simpler vocabulary and syntax. Prefer short "
+            "independent sentences, reduce embedded/adnominal and nominalized "
+            "structures, and replace abstract or advanced lexical items with "
+            "common equivalents where meaning allows."
+        )
     elif target_level == "Intermediate":
-        target_text = "from 25 up to, but not including, 50"
+        target_text = (
+            "from 25 up to, but not including, 50; aim roughly for 32–42"
+        )
+        directional_advice = (
+            "Keep moderate lexical and grammatical variety without drifting "
+            "toward either very simple beginner Korean or dense advanced prose."
+        )
     else:
-        target_text = "50 or higher"
+        target_text = "50 or higher; aim for 55 or higher"
+        directional_advice = (
+            "Increase sophistication naturally through vocabulary, clause "
+            "linking, and grammatical structure without adding irrelevant "
+            "content or artificial verbosity."
+        )
+
+    previous_block = ""
+    if previous_text:
+        clipped = previous_text[:6000]
+        previous_block = (
+            "\n\nPREVIOUS ADAPTATION TO REVISE\n"
+            f"{clipped}"
+        )
+
+    vocab_block = (
+        "\n- Challenging vocabulary still detected: "
+        + ", ".join(challenging_words)
+        if challenging_words
+        else ""
+    )
+
+    structure_block = (
+        "\n- Structural markers still detected: "
+        + ", ".join(structures)
+        if structures
+        else ""
+    )
 
     return (
         f"Independent HanLevel evaluation of the previous adaptation:\n"
@@ -79,11 +146,13 @@ def _format_feedback(
         f"- Vocabulary difficulty: {vocab_text}\n"
         f"- Grammar complexity: {grammar_score:.1f}/100\n"
         f"- Sentence-length difficulty: {sentence_score:.1f}/100\n"
-        f"- Average eojeol per sentence: {avg_eojeol:.1f}\n"
+        f"- Average eojeol per sentence: {avg_eojeol:.1f}"
+        f"{vocab_block}{structure_block}\n"
         f"The requested target is {target_level}, which requires a HanLevel "
-        f"score {target_text}. Revise the text more decisively toward the "
-        f"target while preserving meaning, facts, relationships, names, "
-        f"numbers, and the requested style."
+        f"score {target_text}. {directional_advice} Preserve meaning, facts, "
+        f"relationships, names, numbers, and the requested style. Do not "
+        f"summarize away essential information."
+        f"{previous_block}"
     )
 
 
@@ -163,7 +232,11 @@ def adapt_with_evaluation(
         if target_reached(attempt.analysis, target_level):
             break
 
-        feedback = _format_feedback(attempt.analysis, target_level)
+        feedback = _format_feedback(
+            attempt.analysis,
+            target_level,
+            previous_text=attempt.adapted_text,
+        )
 
     final_attempt = attempts[-1]
     reached = target_reached(final_attempt.analysis, target_level)
@@ -212,6 +285,7 @@ def retry_adaptation(
     feedback = _format_feedback(
         latest_analysis,
         previous_result["target_level"],
+        previous_text=previous_result["final_text"],
     )
 
     attempt = _run_attempt(
