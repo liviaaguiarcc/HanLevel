@@ -13,7 +13,8 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+FALLBACK_MODELS = ("gemini-3.5-flash-lite",)
 
 VALID_LEVELS = {"Beginner", "Intermediate", "Advanced"}
 VALID_STYLES = {"Natural", "Casual", "Learning-friendly"}
@@ -322,10 +323,22 @@ def adapt_text(
 
     selected_model = model or DEFAULT_MODEL
 
+    http_options = types.HttpOptions(
+        retry_options=types.HttpRetryOptions(
+            attempts=1,
+            http_status_codes=[408, 429, 500, 502, 503, 504],
+        ),
+    )
+
     if api_key:
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(
+            api_key=api_key,
+            http_options=http_options,
+        )
     else:
-        client = genai.Client()
+        client = genai.Client(
+            http_options=http_options,
+        )
 
     prompt = build_adaptation_prompt(
         text=text.strip(),
@@ -337,27 +350,59 @@ def adapt_text(
         attempt_number=attempt_number,
     )
 
-    started_at = time.perf_counter()
+    candidate_models = [selected_model]
+    for fallback_model in FALLBACK_MODELS:
+        if fallback_model not in candidate_models:
+            candidate_models.append(fallback_model)
 
-    try:
-        response = client.models.generate_content(
-            model=selected_model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                max_output_tokens=1400,
-                response_mime_type="application/json",
-                response_schema=AdaptationResponse,
-                thinking_config=types.ThinkingConfig(
-                    thinking_level="low",
+    started_at = time.perf_counter()
+    last_error = None
+    response = None
+    used_model = None
+
+    for candidate_model in candidate_models:
+        try:
+            response = client.models.generate_content(
+                model=candidate_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=1400,
+                    response_mime_type="application/json",
+                    response_schema=AdaptationResponse,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_level="low",
+                    ),
                 ),
-            ),
-        )
-    except Exception as exc:
-        raise RuntimeError(
-            f"Gemini request failed with {selected_model}: {exc}"
-        ) from exc
+            )
+            used_model = candidate_model
+            break
+
+        except Exception as exc:
+            error_text = str(exc)
+            lowered = error_text.lower()
+
+            is_transient_or_model_error = (
+                "503" in error_text
+                or "unavailable" in lowered
+                or "high demand" in lowered
+                or "429" in error_text
+                or "resource_exhausted" in lowered
+                or "404" in error_text
+                or "not_found" in lowered
+            )
+
+            if not is_transient_or_model_error:
+                raise
+
+            last_error = exc
 
     latency_seconds = time.perf_counter() - started_at
+
+    if response is None:
+        raise RuntimeError(
+            "Gemini is temporarily unavailable on both configured Flash "
+            "models. Please try again shortly."
+        ) from last_error
 
     if not response.text:
         raise RuntimeError("Gemini returned an empty response.")
@@ -366,6 +411,6 @@ def adapt_text(
 
     return {
         **parsed.model_dump(),
-        "model": selected_model,
+        "model": used_model,
         "latency_seconds": latency_seconds,
     }
