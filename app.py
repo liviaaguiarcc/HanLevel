@@ -711,22 +711,25 @@ hr {
     gap: 5px;
     min-height: 24px;
     padding: 2px 0;
+    white-space: nowrap;
 }
 
-.typing-indicator span {
+.typing-dot {
+    display: inline-block;
     width: 7px;
     height: 7px;
+    flex: 0 0 7px;
     border-radius: 50%;
     background: #786ed7;
     opacity: 0.35;
     animation: hanlevelTyping 1.15s infinite ease-in-out;
 }
 
-.typing-indicator span:nth-child(2) {
+.typing-dot:nth-child(2) {
     animation-delay: 0.16s;
 }
 
-.typing-indicator span:nth-child(3) {
+.typing-dot:nth-child(3) {
     animation-delay: 0.32s;
 }
 
@@ -742,9 +745,13 @@ hr {
 }
 
 .tutor-thinking-label {
+    display: inline-block;
+    width: auto;
+    height: auto;
     margin-left: 8px;
     color: #7a8296;
     font-size: 0.84rem;
+    line-height: 1.2;
 }
 
 </style>
@@ -793,6 +800,19 @@ def get_gemini_api_key():
 
     try:
         return st.secrets["GEMINI_API_KEY"]
+    except (KeyError, FileNotFoundError):
+        return None
+
+
+def get_contact_email():
+
+    email = os.getenv("CONTACT_EMAIL")
+
+    if email:
+        return email
+
+    try:
+        return st.secrets["CONTACT_EMAIL"]
     except (KeyError, FileNotFoundError):
         return None
 
@@ -2019,44 +2039,6 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
             ):
                 selected_question = question
 
-    with st.form(
-        "tutor_question_form",
-        clear_on_submit=True,
-    ):
-
-        custom_question = st.text_input(
-            "Ask anything about this text",
-            placeholder=(
-                "e.g. Why is -는데 used here? "
-                "Is there an easier word for this?"
-            ),
-            disabled=(gemini_api_key is None),
-        )
-
-        ask_button = st.form_submit_button(
-            "Ask tutor",
-            use_container_width=True,
-            disabled=(gemini_api_key is None),
-        )
-
-    pending_question = selected_question
-
-    if ask_button and custom_question.strip():
-        pending_question = custom_question.strip()
-
-    prior_history = list(
-        st.session_state.tutor_history
-    )
-
-    if pending_question:
-
-        st.session_state.tutor_history.append(
-            {
-                "role": "user",
-                "content": pending_question,
-            }
-        )
-
     def build_turns(history):
 
         turns = []
@@ -2078,67 +2060,101 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
         return turns
 
-    if st.session_state.tutor_history:
+    st.markdown("#### Conversation")
 
-        st.markdown("#### Conversation")
-        st.caption(
-            "Newest exchange first · scroll inside the box for earlier messages."
-        )
+    chat_box = st.container(
+        height=430,
+        border=True,
+    )
 
-        chat_box = st.container(
-            height=380,
-            border=True,
-        )
+    pending_question = selected_question
+    prior_history = list(
+        st.session_state.tutor_history
+    )
 
-        with chat_box:
+    with chat_box:
 
-            turns = build_turns(
-                st.session_state.tutor_history
+        with st.form(
+            "tutor_question_form",
+            clear_on_submit=True,
+        ):
+
+            custom_question = st.text_input(
+                "Ask me anything about this text",
+                placeholder=(
+                    "e.g. Why is -는데 used here? "
+                    "Is there an easier word for this?"
+                ),
+                disabled=(gemini_api_key is None),
             )
 
-            # Newest turn first means a fresh tutor answer opens at its
-            # beginning instead of leaving the user at the bottom of it.
-            for turn_index, turn in enumerate(
-                reversed(turns)
+            ask_button = st.form_submit_button(
+                "Send",
+                use_container_width=True,
+                disabled=(gemini_api_key is None),
+            )
+
+        if ask_button and custom_question.strip():
+            pending_question = custom_question.strip()
+
+        if pending_question:
+
+            st.session_state.tutor_history.append(
+                {
+                    "role": "user",
+                    "content": pending_question,
+                }
+            )
+
+        turns = build_turns(
+            st.session_state.tutor_history
+        )
+
+        if not turns:
+            st.caption(
+                "Pick a question above or type your own here. "
+                "I'll stay focused on this text with you ^^"
+            )
+
+        for turn_index, turn in enumerate(
+            reversed(turns)
+        ):
+
+            for message in turn:
+
+                with st.chat_message(
+                    message["role"]
+                ):
+                    st.markdown(
+                        message["content"]
+                    )
+
+            if (
+                pending_question
+                and turn_index == 0
+                and turn[-1]["role"] == "user"
             ):
 
-                for message in turn:
-
-                    with st.chat_message(
-                        message["role"]
-                    ):
-                        st.markdown(
-                            message["content"]
-                        )
-
-                if (
-                    pending_question
-                    and turn_index == 0
-                    and turn[-1]["role"] == "user"
+                with st.chat_message(
+                    "assistant"
                 ):
 
-                    with st.chat_message(
-                        "assistant"
-                    ):
+                    typing_placeholder = st.empty()
 
-                        typing_placeholder = st.empty()
+                    typing_placeholder.markdown(
+                        """
+                        <div class="typing-indicator">
+                            <span class="typing-dot"></span>
+                            <span class="typing-dot"></span>
+                            <span class="typing-dot"></span>
+                            <span class="tutor-thinking-label">thinking...</span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-                        typing_placeholder.markdown(
-                            """
-                            <div class="typing-indicator">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                                <span class="tutor-thinking-label">
-                                    thinking...
-                                </span>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-
-                if turn_index < len(turns) - 1:
-                    st.divider()
+            if turn_index < len(turns) - 1:
+                st.divider()
 
     if pending_question:
 
@@ -2191,7 +2207,40 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                     answer
                 )
 
-        # Keep recent context without letting a long study session grow forever.
         st.session_state.tutor_history = (
             st.session_state.tutor_history[-20:]
         )
+
+    st.markdown("---")
+
+    st.caption(
+        "Found a problem, strange explanation, or possible AI hallucination? "
+        "Please tell us so we can improve the tutor."
+    )
+
+    with st.popover(
+        "Contact the creator"
+    ):
+
+        st.markdown(
+            """
+            **Hi ^^ I'm the HanLevel Tutor.**
+
+            This is my creator, **Livia**. If I said something inaccurate,
+            confusing, or strange, please let her know :)
+            """
+        )
+
+        contact_email = get_contact_email()
+
+        if contact_email:
+
+            st.markdown(
+                f"**Email Livia:** [{contact_email}](mailto:{contact_email})"
+            )
+
+        else:
+
+            st.caption(
+                "Contact email is not configured yet."
+            )
