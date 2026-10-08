@@ -162,6 +162,9 @@ GROUNDING RULES
 - Avoid overly formal openings, repetitive praise, or long disclaimers.
 - Complete every answer fully. Never stop after introducing a list, example,
   contrast, or set of suggestions.
+- Start with the useful content rather than a long introduction. If you say
+  you will explain two patterns or give two alternatives, you MUST include
+  both before ending the response.
 - Keep answers focused and educational. Usually 2-5 short paragraphs or a
   compact set of examples is enough.
 
@@ -230,10 +233,9 @@ def ask_tutor(
                 model=candidate_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    max_output_tokens=1200,
-                    temperature=0.25,
+                    max_output_tokens=4096,
                     thinking_config=types.ThinkingConfig(
-                        thinking_level="low",
+                        thinking_level="minimal",
                     ),
                 ),
             )
