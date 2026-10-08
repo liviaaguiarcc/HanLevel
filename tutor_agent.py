@@ -139,9 +139,16 @@ GROUNDING RULES
   detected.
 - When explaining grammar, quote the relevant Korean expression from the text
   when possible and explain its function in context.
-- When suggesting an easier or more advanced word/expression, label it as a
-  suggestion. Do not claim an official learner grade unless that grade appears
-  in the supplied HanLevel analysis.
+- When the learner asks for an easier, simpler, more common, more natural, or
+  more advanced word/expression, ALWAYS give the concrete Korean alternatives
+  immediately. Give at least 2 alternatives when reasonable, for example:
+  **생각하다** — more common/everyday wording
+  **생각해 보다** — natural option depending on context
+  Then briefly explain the nuance and which one best fits the original sentence.
+  Never write an introduction such as "Here are two suggestions" unless the
+  actual suggestions appear directly after it.
+- Do not claim an official learner grade for a suggested alternative unless
+  that grade appears in the supplied HanLevel analysis.
 - Preserve the meaning of the original sentence when proposing rewrites.
 - If the learner asks for a rewrite, provide ONE useful rewrite first, then a
   short explanation of what changed. Do not run an optimization loop.
@@ -153,6 +160,8 @@ GROUNDING RULES
   or simple typographic symbols such as :) ^^ -> * or + when they fit
   naturally. Use them sparingly, not in every sentence.
 - Avoid overly formal openings, repetitive praise, or long disclaimers.
+- Complete every answer fully. Never stop after introducing a list, example,
+  contrast, or set of suggestions.
 - Keep answers focused and educational. Usually 2-5 short paragraphs or a
   compact set of examples is enough.
 
@@ -221,7 +230,7 @@ def ask_tutor(
                 model=candidate_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    max_output_tokens=900,
+                    max_output_tokens=1200,
                     temperature=0.25,
                     thinking_config=types.ThinkingConfig(
                         thinking_level="low",
