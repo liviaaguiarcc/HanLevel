@@ -1,7 +1,7 @@
 """AI text adaptation layer for HanLevel v1.0.
 
-This module is intentionally separate from HanLevel's rule-based analyzer.
-The generative model adapts text; HanLevel independently evaluates the result.
+The generative model adapts text. HanLevel's rule-based analyzer independently
+scores every candidate, so generation and evaluation remain separate.
 """
 
 import os
@@ -22,35 +22,81 @@ LEVEL_GUIDANCE = {
     "Beginner": (
         "Use very common learner-friendly vocabulary and short, direct "
         "sentences. Prefer simple clause structures and explicit connections. "
-        "Avoid dense nominalization, long adnominal chains, abstract wording, "
-        "and unnecessarily complex connective endings. Preserve every "
-        "essential idea instead of summarizing it away. Aim comfortably inside "
-        "the Beginner band rather than barely crossing the threshold."
+        "Paraphrase difficult technical or abstract terms into simpler Korean "
+        "when possible instead of preserving the difficult wording itself. "
+        "Avoid dense nominalization, long adnominal chains, and nested clauses. "
+        "Preserve the propositions and essential information; do not summarize "
+        "them away."
     ),
     "Intermediate": (
         "Use natural intermediate-level Korean with moderately varied "
-        "vocabulary and grammar. Keep sentences readable while allowing "
-        "some connected and embedded structures. Aim for the middle of the "
-        "Intermediate band rather than near a boundary."
+        "vocabulary and grammar. Keep sentences readable while allowing some "
+        "connected and embedded structures. Avoid unnecessary advanced lexical "
+        "choices."
     ),
     "Advanced": (
         "Use natural Korean appropriate for proficient readers. Increase "
-        "lexical and grammatical sophistication only when it sounds natural; "
-        "do not make the text artificially verbose or obscure. Aim clearly "
-        "inside the Advanced band rather than just above the threshold."
+        "lexical and grammatical sophistication only when it sounds natural. "
+        "Do not add information or make the text artificially verbose."
     ),
 }
 
 STYLE_GUIDANCE = {
     "Natural": (
-        "Preserve the source text's register and tone as closely as possible."
+        "Preserve the source register and tone where they are compatible with "
+        "the requested difficulty. If register and target difficulty conflict, "
+        "prioritize the target difficulty."
     ),
     "Casual": (
-        "Use natural everyday conversational Korean while preserving meaning."
+        "Use natural everyday conversational Korean while preserving meaning. "
+        "Difficulty control still takes priority over stylistic flourish."
     ),
     "Learning-friendly": (
         "Prioritize clarity, explicit connections between ideas, and "
         "learner-accessible wording while preserving the requested level."
+    ),
+}
+
+# These are control hints derived from HanLevel v0.1's internal calibration.
+# They are not external proficiency standards and are intentionally described
+# as soft targets rather than hard linguistic rules.
+TARGET_CONTROL = {
+    "Beginner": (
+        "Aim comfortably below the Beginner cutoff, not barely under it. "
+        "As a practical control target: prefer mostly beginner-graded lexical "
+        "items; keep sentences around 4-7 eojeol when possible; prefer separate "
+        "sentences over clause chains; avoid ETM/ETN-style embedding where a "
+        "simple independent sentence can express the same proposition; use "
+        "simple connectives sparingly. A final score around 10-20 is safer "
+        "than aiming for 24."
+    ),
+    "Intermediate": (
+        "Aim near the middle of the Intermediate band rather than a boundary. "
+        "Use a mix of beginner and intermediate vocabulary, readable connected "
+        "sentences, and moderate structural complexity."
+    ),
+    "Advanced": (
+        "Aim clearly inside the Advanced band. Use naturally sophisticated "
+        "lexical choices, longer connected discourse, and varied grammatical "
+        "structure without padding the text or inventing detail."
+    ),
+}
+
+LEVEL_EXAMPLES = {
+    "Beginner": (
+        "Difficulty references only (do not copy their content):\n"
+        "저는 학생이에요. 매일 학교에 가요.\n"
+        "주말에 가족과 영화를 봤어요. 영화가 아주 재미있었어요."
+    ),
+    "Intermediate": (
+        "Difficulty references only (do not copy their content):\n"
+        "한국어를 공부한 지 일 년이 되었지만 아직 모르는 표현이 많습니다.\n"
+        "친구가 추천해 준 책을 읽어 보았는데 생각보다 내용이 어려웠습니다."
+    ),
+    "Advanced": (
+        "Difficulty references only (do not copy their content):\n"
+        "기술의 급속한 발전은 생활의 편리함을 높이는 반면 새로운 사회적 문제를 초래하기도 한다.\n"
+        "연구 결과를 해석할 때에는 통계적 유의성뿐만 아니라 연구 설계와 자료 수집 과정의 한계도 함께 고려해야 한다."
     ),
 }
 
@@ -102,12 +148,66 @@ def _analysis_summary(analysis: dict) -> str:
     )
 
 
+def _diagnostic_items(analysis: dict) -> str:
+    difficult_words = []
+    seen_words = set()
+
+    for item in analysis["vocabulary"]["words"]:
+        grade = item.get("grade")
+        word = item.get("word")
+
+        if grade not in {"중급", "고급"} or not word or word in seen_words:
+            continue
+
+        seen_words.add(word)
+        label = "Intermediate" if grade == "중급" else "Advanced"
+        difficult_words.append(f"{word} ({label})")
+
+        if len(difficult_words) >= 16:
+            break
+
+    structures = []
+    seen_structures = set()
+
+    for item in analysis["grammar"]["structures"]:
+        form = item.get("form")
+        tag = item.get("tag")
+        key = (form, tag)
+
+        if not form or key in seen_structures:
+            continue
+
+        seen_structures.add(key)
+        structures.append(f"{form} ({tag})")
+
+        if len(structures) >= 16:
+            break
+
+    blocks = []
+
+    if difficult_words:
+        blocks.append(
+            "Lexical items currently contributing difficulty:\n- "
+            + "\n- ".join(difficult_words)
+        )
+
+    if structures:
+        blocks.append(
+            "Structural markers currently contributing complexity:\n- "
+            + "\n- ".join(structures)
+        )
+
+    return "\n\n".join(blocks) if blocks else "No extra diagnostic items."
+
+
 def build_adaptation_prompt(
     text: str,
     target_level: str,
     style: str,
-    original_analysis: dict,
+    current_analysis: dict,
     feedback: str | None = None,
+    original_text: str | None = None,
+    attempt_number: int = 1,
 ) -> str:
     """Build the controlled Korean text-adaptation prompt."""
 
@@ -123,12 +223,12 @@ def build_adaptation_prompt(
             f"Choose one of {sorted(VALID_STYLES)}."
         )
 
+    semantic_anchor = (original_text or text).strip()
+
     retry_context = ""
     if feedback:
         retry_context = (
-            "\n\nA previous adaptation missed the target. "
-            "Use the independent HanLevel feedback below to revise more "
-            "precisely. Do not mention this retry in the adapted text.\n"
+            "\n\nEVALUATOR FEEDBACK FROM THE PREVIOUS CANDIDATE\n"
             f"{feedback}"
         )
 
@@ -136,9 +236,17 @@ def build_adaptation_prompt(
 You are the generative adaptation component of HanLevel, a Korean readability
 tool for language learners.
 
-TASK
-Adapt the Korean source text to the requested HanLevel target difficulty and
-style.
+PRIORITIES — FOLLOW IN THIS ORDER
+1. Preserve the original propositions, facts, names, numbers, relationships,
+   speaker position, and conclusion.
+2. Hit the requested HanLevel difficulty band.
+3. Apply the requested style.
+If style conflicts with the target difficulty, relax the style before missing
+the target. Preserve meaning, but you may paraphrase difficult terminology into
+simpler explanations when adapting downward.
+
+ATTEMPT
+{attempt_number}
 
 TARGET DIFFICULTY
 {target_level}
@@ -146,38 +254,50 @@ TARGET DIFFICULTY
 TARGET-LEVEL GUIDANCE
 {LEVEL_GUIDANCE[target_level]}
 
+HANLEVEL CONTROL HINTS
+{TARGET_CONTROL[target_level]}
+
+REFERENCE EXAMPLES
+{LEVEL_EXAMPLES[target_level]}
+
 STYLE
 {style}
 
 STYLE GUIDANCE
 {STYLE_GUIDANCE[style]}
 
-SOURCE HANLEVEL ANALYSIS
-{_analysis_summary(original_analysis)}
+CURRENT CANDIDATE HANLEVEL ANALYSIS
+{_analysis_summary(current_analysis)}
+
+CURRENT DIAGNOSTIC ITEMS
+{_diagnostic_items(current_analysis)}
+
+ORIGINAL MEANING ANCHOR
+This is the original text whose meaning must remain represented:
+{semantic_anchor}
+
+CURRENT TEXT TO ADAPT OR REVISE
+{text}
 
 MEANING-PRESERVATION RULES
-- Preserve the original meaning, facts, named entities, numbers, relationships,
-  speaker position, and conclusion as closely as possible.
 - Do not invent facts or examples.
-- Do not remove essential information.
+- Do not change names, numbers, relationships, stance, or conclusions.
 - Do not turn the text into a summary.
-- You may replace vocabulary, restructure clauses, split or combine sentences,
-  make connections more explicit, and adjust grammar/register when needed.
-- If adapting upward, increase sophistication naturally rather than adding
-  unnecessary verbosity.
-- If adapting downward, simplify language and structure without flattening the
-  core meaning.
-- Return natural Korean, not textbook-like fragments.
-- The target level and style are independent: a text may remain at the same
-  level while its style changes.
-
-SOURCE TEXT
-{text}
+- Preserve each important proposition, even if it must be unpacked into several
+  shorter sentences.
+- You may replace terminology with plain-language paraphrases, restructure
+  clauses, split or combine sentences, make implicit links explicit, and adjust
+  grammar/register.
+- When adapting upward, sophistication must be natural rather than verbose.
+- When adapting downward, simple wording and sentence structure matter more
+  than preserving the original surface form.
+- Return coherent, natural Korean rather than disconnected textbook fragments.
 {retry_context}
 
 OUTPUT
-Return the complete adapted Korean text plus concise educational change notes.
-The change notes must describe changes that actually appear in the output.
+Adaptation quality is the highest priority. Return the complete adapted Korean
+text plus concise educational change notes. The notes must describe changes
+that actually appear in the adapted text.
 """.strip()
 
 
@@ -189,6 +309,8 @@ def adapt_text(
     feedback: str | None = None,
     api_key: str | None = None,
     model: str | None = None,
+    original_text: str | None = None,
+    attempt_number: int = 1,
 ) -> dict:
     """Adapt Korean text with Gemini and return structured output."""
 
@@ -200,22 +322,20 @@ def adapt_text(
     if api_key:
         client = genai.Client(api_key=api_key)
     else:
-        # The Google SDK automatically reads GEMINI_API_KEY when available.
         client = genai.Client()
 
     prompt = build_adaptation_prompt(
         text=text.strip(),
         target_level=target_level,
         style=style,
-        original_analysis=original_analysis,
+        current_analysis=original_analysis,
         feedback=feedback,
+        original_text=original_text,
+        attempt_number=attempt_number,
     )
 
     candidate_models = [selected_model]
 
-    # If Gemini 3.8 Flash is temporarily overloaded, keep the app usable by
-    # falling back to other current free-tier Flash models. Avoid duplicates
-    # when GEMINI_MODEL already points to one of the fallback models.
     for fallback_model in FALLBACK_MODELS:
         if fallback_model not in candidate_models:
             candidate_models.append(fallback_model)
@@ -234,7 +354,7 @@ def adapt_text(
                     response_mime_type="application/json",
                     response_schema=AdaptationResponse,
                     thinking_config=types.ThinkingConfig(
-                        thinking_level="low",
+                        thinking_level="medium",
                     ),
                 ),
             )
