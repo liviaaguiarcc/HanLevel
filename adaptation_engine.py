@@ -1,7 +1,8 @@
 """HanLevel v1.0 adaptation workflow.
 
-Gemini generates a candidate, HanLevel independently evaluates it, and failed
-candidates are revised iteratively. Generation and evaluation remain separate.
+Each AI generation produces three candidate rewrites in a single model call.
+HanLevel scores all candidates locally and selects the one closest to the
+requested readability band. Manual retry is available only when needed.
 """
 
 from __future__ import annotations
@@ -27,12 +28,11 @@ TARGET_CENTERS = {
 
 
 @dataclass
-class AdaptationAttempt:
+class CandidateResult:
     number: int
+    generation: int
     adapted_text: str
     analysis: dict[str, Any]
-    change_summary: list[str]
-    notable_changes: list[dict[str, Any]]
     model: str
     latency_seconds: float = 0.0
 
@@ -55,10 +55,6 @@ def target_reached(analysis: dict[str, Any], target_level: str) -> bool:
 
 
 def distance_to_target(analysis: dict[str, Any], target_level: str) -> float:
-    """Distance from a score to the requested band.
-
-    Inside the band, distance is zero. Outside it, smaller is better.
-    """
     if target_level not in TARGET_BANDS:
         raise ValueError(f"Unknown target level: {target_level}")
 
@@ -74,176 +70,196 @@ def distance_to_target(analysis: dict[str, Any], target_level: str) -> float:
     return score - upper
 
 
+def _best_candidate(
+    candidates: list[CandidateResult],
+    target_level: str,
+) -> CandidateResult:
+    successful = [
+        candidate
+        for candidate in candidates
+        if target_reached(candidate.analysis, target_level)
+    ]
+
+    if successful:
+        center = TARGET_CENTERS[target_level]
+        return min(
+            successful,
+            key=lambda candidate: abs(candidate.score - center),
+        )
+
+    return min(
+        candidates,
+        key=lambda candidate: distance_to_target(
+            candidate.analysis,
+            target_level,
+        ),
+    )
+
+
+def _serialize_candidate(candidate: CandidateResult) -> dict[str, Any]:
+    return {
+        "number": candidate.number,
+        "generation": candidate.generation,
+        "adapted_text": candidate.adapted_text,
+        "analysis": candidate.analysis,
+        "score": candidate.score,
+        "level": candidate.level,
+        "model": candidate.model,
+        "latency_seconds": candidate.latency_seconds,
+    }
+
+
+def _difficult_word_count(analysis: dict[str, Any]) -> int:
+    return sum(
+        1
+        for item in analysis["vocabulary"]["words"]
+        if item.get("grade") in {"중급", "고급"}
+    )
+
+
+def _build_change_explanations(
+    original_analysis: dict[str, Any],
+    adapted_analysis: dict[str, Any],
+) -> tuple[list[str], list[dict[str, str]]]:
+    original_score = float(original_analysis["final_score"])
+    adapted_score = float(adapted_analysis["final_score"])
+
+    original_avg = float(
+        original_analysis["sentence_length"]["average_eojeol"]
+    )
+    adapted_avg = float(
+        adapted_analysis["sentence_length"]["average_eojeol"]
+    )
+
+    original_sentences = int(
+        original_analysis["sentence_length"]["sentence_count"]
+    )
+    adapted_sentences = int(
+        adapted_analysis["sentence_length"]["sentence_count"]
+    )
+
+    original_difficult = _difficult_word_count(original_analysis)
+    adapted_difficult = _difficult_word_count(adapted_analysis)
+
+    original_structures = len(original_analysis["grammar"]["structures"])
+    adapted_structures = len(adapted_analysis["grammar"]["structures"])
+
+    summaries = [
+        (
+            f"HanLevel score changed from {original_score:.1f} "
+            f"to {adapted_score:.1f}."
+        ),
+        (
+            f"Average sentence length changed from {original_avg:.1f} "
+            f"to {adapted_avg:.1f} eojeol."
+        ),
+    ]
+
+    notable_changes = [
+        {
+            "category": "Vocabulary",
+            "original": f"{original_difficult} intermediate/advanced items detected",
+            "adapted": f"{adapted_difficult} intermediate/advanced items detected",
+            "explanation": (
+                "This is computed directly from HanLevel's KRDICT-based "
+                "vocabulary analysis."
+            ),
+        },
+        {
+            "category": "Sentence structure",
+            "original": (
+                f"{original_sentences} sentence(s), "
+                f"{original_avg:.1f} eojeol on average"
+            ),
+            "adapted": (
+                f"{adapted_sentences} sentence(s), "
+                f"{adapted_avg:.1f} eojeol on average"
+            ),
+            "explanation": (
+                "Shorter or more segmented sentences generally reduce the "
+                "sentence-length component of HanLevel."
+            ),
+        },
+        {
+            "category": "Grammar",
+            "original": f"{original_structures} weighted structures detected",
+            "adapted": f"{adapted_structures} weighted structures detected",
+            "explanation": (
+                "This count reflects the grammar markers HanLevel currently "
+                "uses in its rule-based complexity score."
+            ),
+        },
+    ]
+
+    return summaries, notable_changes
+
+
 def _format_feedback(
     analysis: dict[str, Any],
     target_level: str,
-    previous_text: str | None = None,
 ) -> str:
-    """Create actionable evaluator feedback for a corrective revision."""
-
     vocab_score = analysis["vocabulary"]["vocabulary_score"]
     vocab_text = (
-        f"{vocab_score:.1f}/100"
+        f"{vocab_score:.1f}"
         if vocab_score is not None
         else "unavailable"
     )
 
-    grammar_score = analysis["grammar"]["grammar_score"]
-    sentence_score = analysis["sentence_length"]["sentence_length_score"]
-    avg_eojeol = analysis["sentence_length"]["average_eojeol"]
+    grammar_score = float(analysis["grammar"]["grammar_score"])
+    sentence_score = float(
+        analysis["sentence_length"]["sentence_length_score"]
+    )
 
-    # Mirror HanLevel's actual weighting so the corrective prompt attacks the
-    # component that is contributing the most to the current score.
     contributions = {
         "Grammar": grammar_score * 0.35,
         "Sentence length": sentence_score * 0.20,
     }
 
     if vocab_score is not None:
-        contributions["Vocabulary"] = vocab_score * 0.45
+        contributions["Vocabulary"] = float(vocab_score) * 0.45
 
-    strongest_component = max(contributions, key=contributions.get)
+    blocker = max(contributions, key=contributions.get)
 
-    if strongest_component == "Vocabulary":
-        blocker_advice = (
-            "The largest weighted blocker is VOCABULARY. Replace or paraphrase "
-            "the listed intermediate/advanced lexical items with common words "
-            "or simple explanatory phrases. Preserve the concept, not the "
-            "original difficult term."
+    if blocker == "Vocabulary":
+        action = (
+            "Replace or paraphrase the remaining intermediate/advanced words "
+            "using common Korean. Preserve concepts, not difficult wording."
         )
-    elif strongest_component == "Grammar":
-        blocker_advice = (
-            "The largest weighted blocker is GRAMMAR. Break embedded clauses "
-            "into independent sentences, reduce nominalization and adnominal "
-            "chains, and prefer direct predicate structures."
+    elif blocker == "Grammar":
+        action = (
+            "Use more independent sentences and fewer embedded, adnominal, "
+            "nominalized, or heavily connected structures."
         )
     else:
-        blocker_advice = (
-            "The largest weighted blocker is SENTENCE LENGTH. Split long "
-            "sentences aggressively while preserving every proposition."
+        action = (
+            "Split sentences more aggressively while preserving all important "
+            "propositions."
         )
-
-    challenging_words = []
-    seen_words = set()
-
-    for item in analysis["vocabulary"]["words"]:
-        if item.get("grade") not in {"중급", "고급"}:
-            continue
-
-        word = item.get("word")
-
-        if not word or word in seen_words:
-            continue
-
-        seen_words.add(word)
-        challenging_words.append(word)
-
-        if len(challenging_words) >= 16:
-            break
-
-    structures = []
-    seen_structures = set()
-
-    for item in analysis["grammar"]["structures"]:
-        form = item.get("form")
-        tag = item.get("tag")
-        key = (form, tag)
-
-        if not form or key in seen_structures:
-            continue
-
-        seen_structures.add(key)
-        structures.append(f"{form} ({tag})")
-
-        if len(structures) >= 16:
-            break
-
-    if target_level == "Beginner":
-        target_text = (
-            "below 25; aim around 10-20 rather than barely below 25"
-        )
-        directional_advice = (
-            "Revise the CURRENT CANDIDATE, not the original wording. "
-            "Reduce difficult lexical items one by one. Split long clauses "
-            "into short independent sentences. Replace abstract nouns with "
-            "plain-language paraphrases where possible. Avoid ETM/ETN-style "
-            "embedding and long connective chains when the same proposition "
-            "can be expressed directly."
-        )
-
-    elif target_level == "Intermediate":
-        target_text = (
-            "from 25 up to, but not including, 50; aim around 32-42"
-        )
-        directional_advice = (
-            "Revise the CURRENT CANDIDATE toward moderate vocabulary and "
-            "grammar. Avoid both beginner-like oversimplification and dense "
-            "advanced structures."
-        )
-
-    else:
-        target_text = "50 or higher; aim around 55-70"
-        directional_advice = (
-            "Revise the CURRENT CANDIDATE with natural lexical and grammatical "
-            "sophistication. Do not add irrelevant facts or artificial padding."
-        )
-
-    previous_block = ""
-
-    if previous_text:
-        previous_block = (
-            "\n\nCURRENT CANDIDATE TO REVISE\n"
-            f"{previous_text[:6000]}"
-        )
-
-    vocab_block = (
-        "\n- Difficult lexical items still detected: "
-        + ", ".join(challenging_words)
-        if challenging_words
-        else ""
-    )
-
-    structure_block = (
-        "\n- Complexity markers still detected: "
-        + ", ".join(structures)
-        if structures
-        else ""
-    )
 
     return (
-        f"Independent HanLevel evaluation of the current candidate:\n"
-        f"- Result: {analysis['level']}\n"
-        f"- HanLevel score: {analysis['final_score']:.1f}/100\n"
-        f"- Vocabulary difficulty: {vocab_text}\n"
-        f"- Grammar complexity: {grammar_score:.1f}/100\n"
-        f"- Sentence-length difficulty: {sentence_score:.1f}/100\n"
-        f"- Average eojeol per sentence: {avg_eojeol:.1f}\n"
-        f"- Strongest weighted blocker: {strongest_component}\n"
-        f"- Priority action: {blocker_advice}"
-        f"{vocab_block}{structure_block}\n"
-        f"The requested target is {target_level}, which requires a score "
-        f"{target_text}. {directional_advice} Preserve the original meaning, "
-        f"facts, names, numbers, relationships, stance, and conclusions."
-        f"{previous_block}"
+        f"Best candidate still scored {analysis['final_score']:.1f}/100 "
+        f"({analysis['level']}). Target: {target_level}. "
+        f"Vocabulary={vocab_text}, Grammar={grammar_score:.1f}, "
+        f"Sentence={sentence_score:.1f}. "
+        f"Main blocker: {blocker}. {action}"
     )
 
 
-def _run_attempt(
+def _generate_and_score(
     *,
-    number: int,
-    candidate_text: str,
+    text: str,
+    original_text: str,
     target_level: str,
     style: str,
     current_analysis: dict[str, Any],
-    original_text: str,
+    generation: int,
+    first_candidate_number: int,
     feedback: str | None,
     api_key: str | None,
     model: str | None,
-) -> AdaptationAttempt:
-    """Generate one revision of the current candidate and evaluate it."""
-
+) -> list[CandidateResult]:
     generated = adapt_text(
-        text=candidate_text,
+        text=text,
         target_level=target_level,
         style=style,
         original_analysis=current_analysis,
@@ -251,63 +267,27 @@ def _run_attempt(
         api_key=api_key,
         model=model,
         original_text=original_text,
-        attempt_number=number,
+        attempt_number=generation,
     )
 
-    adapted_text = generated["adapted_text"].strip()
-    adapted_analysis = analyze_text(adapted_text)
+    results = []
 
-    return AdaptationAttempt(
-        number=number,
-        adapted_text=adapted_text,
-        analysis=adapted_analysis,
-        change_summary=generated.get("change_summary", []),
-        notable_changes=generated.get("notable_changes", []),
-        model=generated["model"],
-        latency_seconds=float(generated.get("latency_seconds", 0.0)),
-    )
-
-
-def _serialize_attempt(attempt: AdaptationAttempt) -> dict[str, Any]:
-    return {
-        "number": attempt.number,
-        "adapted_text": attempt.adapted_text,
-        "analysis": attempt.analysis,
-        "score": attempt.score,
-        "level": attempt.level,
-        "change_summary": attempt.change_summary,
-        "notable_changes": attempt.notable_changes,
-        "model": attempt.model,
-        "latency_seconds": attempt.latency_seconds,
-    }
-
-
-def _best_attempt(
-    attempts: list[AdaptationAttempt],
-    target_level: str,
-) -> AdaptationAttempt:
-    """Return the candidate closest to the requested target band."""
-
-    successful = [
-        attempt
-        for attempt in attempts
-        if target_reached(attempt.analysis, target_level)
-    ]
-
-    if successful:
-        target_center = TARGET_CENTERS[target_level]
-        return min(
-            successful,
-            key=lambda attempt: abs(attempt.score - target_center),
+    for offset, candidate_text in enumerate(generated["candidates"]):
+        analysis = analyze_text(candidate_text)
+        results.append(
+            CandidateResult(
+                number=first_candidate_number + offset,
+                generation=generation,
+                adapted_text=candidate_text,
+                analysis=analysis,
+                model=generated["model"],
+                latency_seconds=float(
+                    generated.get("latency_seconds", 0.0)
+                ),
+            )
         )
 
-    return min(
-        attempts,
-        key=lambda attempt: distance_to_target(
-            attempt.analysis,
-            target_level,
-        ),
-    )
+    return results
 
 
 def adapt_with_evaluation(
@@ -318,57 +298,42 @@ def adapt_with_evaluation(
     *,
     api_key: str | None = None,
     model: str | None = None,
-    max_automatic_attempts: int = 2,
+    max_automatic_attempts: int = 1,
 ) -> dict[str, Any]:
-    """Adapt, evaluate, and automatically revise once when needed.
+    """Generate three candidates once, score locally, and select the best.
 
-    The important behavior is iterative:
-    attempt 1 adapts the original;
-    attempt 2 revises attempt 1 using HanLevel's diagnostics.
+    There is intentionally no automatic second API call. This keeps the
+    interactive experience fast. If all three candidates miss the target, the
+    UI offers a manual retry using HanLevel's diagnostics.
     """
 
-    if max_automatic_attempts < 1:
-        raise ValueError("max_automatic_attempts must be at least 1.")
-
-    max_automatic_attempts = min(max_automatic_attempts, 2)
-
     original_text = text.strip()
+
+    if not original_text:
+        raise ValueError("Text cannot be empty.")
+
     source_analysis = original_analysis or analyze_text(original_text)
 
-    attempts: list[AdaptationAttempt] = []
-    candidate_text = original_text
-    current_analysis = source_analysis
-    feedback = None
+    candidates = _generate_and_score(
+        text=original_text,
+        original_text=original_text,
+        target_level=target_level,
+        style=style,
+        current_analysis=source_analysis,
+        generation=1,
+        first_candidate_number=1,
+        feedback=None,
+        api_key=api_key,
+        model=model,
+    )
 
-    for attempt_number in range(1, max_automatic_attempts + 1):
-        attempt = _run_attempt(
-            number=attempt_number,
-            candidate_text=candidate_text,
-            target_level=target_level,
-            style=style,
-            current_analysis=current_analysis,
-            original_text=original_text,
-            feedback=feedback,
-            api_key=api_key,
-            model=model,
-        )
+    best = _best_candidate(candidates, target_level)
+    reached = target_reached(best.analysis, target_level)
 
-        attempts.append(attempt)
-
-        if target_reached(attempt.analysis, target_level):
-            break
-
-        # Critical: the next pass revises the generated candidate itself.
-        candidate_text = attempt.adapted_text
-        current_analysis = attempt.analysis
-        feedback = _format_feedback(
-            attempt.analysis,
-            target_level,
-            previous_text=attempt.adapted_text,
-        )
-
-    best_attempt = _best_attempt(attempts, target_level)
-    reached = target_reached(best_attempt.analysis, target_level)
+    change_summary, notable_changes = _build_change_explanations(
+        source_analysis,
+        best.analysis,
+    )
 
     return {
         "original_text": original_text,
@@ -376,16 +341,18 @@ def adapt_with_evaluation(
         "target_level": target_level,
         "style": style,
         "target_reached": reached,
-        "attempt_count": len(attempts),
-        "best_attempt_number": best_attempt.number,
-        "final_text": best_attempt.adapted_text,
-        "final_analysis": best_attempt.analysis,
-        "change_summary": best_attempt.change_summary,
-        "notable_changes": best_attempt.notable_changes,
-        "model": best_attempt.model,
+        "attempt_count": 1,
+        "generation_count": 1,
+        "best_attempt_number": best.number,
+        "best_candidate_number": best.number,
+        "final_text": best.adapted_text,
+        "final_analysis": best.analysis,
+        "change_summary": change_summary,
+        "notable_changes": notable_changes,
+        "model": best.model,
         "attempts": [
-            _serialize_attempt(attempt)
-            for attempt in attempts
+            _serialize_candidate(candidate)
+            for candidate in candidates
         ],
     }
 
@@ -396,65 +363,76 @@ def retry_adaptation(
     api_key: str | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
-    """Run one manual revision of the best current candidate."""
+    """Generate three revised candidates only when the user asks to retry."""
 
     current_text = previous_result["final_text"]
     current_analysis = previous_result["final_analysis"]
+    generation = int(previous_result.get("generation_count", 1)) + 1
 
-    feedback = _format_feedback(
-        current_analysis,
-        previous_result["target_level"],
-        previous_text=current_text,
-    )
+    existing = list(previous_result.get("attempts", []))
+    first_candidate_number = len(existing) + 1
 
-    attempt_number = int(previous_result.get("attempt_count", 0)) + 1
-
-    new_attempt = _run_attempt(
-        number=attempt_number,
-        candidate_text=current_text,
+    new_candidates = _generate_and_score(
+        text=current_text,
+        original_text=previous_result["original_text"],
         target_level=previous_result["target_level"],
         style=previous_result["style"],
         current_analysis=current_analysis,
-        original_text=previous_result["original_text"],
-        feedback=feedback,
+        generation=generation,
+        first_candidate_number=first_candidate_number,
+        feedback=_format_feedback(
+            current_analysis,
+            previous_result["target_level"],
+        ),
         api_key=api_key,
         model=model,
     )
 
-    existing_attempts = list(previous_result.get("attempts", []))
-    existing_attempts.append(_serialize_attempt(new_attempt))
+    all_candidates = existing + [
+        _serialize_candidate(candidate)
+        for candidate in new_candidates
+    ]
 
-    # Compare the new candidate with the previous best instead of assuming
-    # later automatically means better.
-    previous_best = AdaptationAttempt(
-        number=int(previous_result.get("best_attempt_number", 1)),
-        adapted_text=previous_result["final_text"],
-        analysis=previous_result["final_analysis"],
-        change_summary=previous_result.get("change_summary", []),
-        notable_changes=previous_result.get("notable_changes", []),
-        model=previous_result.get("model", new_attempt.model),
-        latency_seconds=0.0,
-    )
+    # Reconstruct lightweight CandidateResult objects so the best candidate can
+    # be selected across both generations.
+    reconstructed = [
+        CandidateResult(
+            number=int(item["number"]),
+            generation=int(item.get("generation", 1)),
+            adapted_text=item["adapted_text"],
+            analysis=item["analysis"],
+            model=item.get("model", previous_result.get("model", "")),
+            latency_seconds=float(item.get("latency_seconds", 0.0)),
+        )
+        for item in all_candidates
+    ]
 
-    best_attempt = _best_attempt(
-        [previous_best, new_attempt],
+    best = _best_candidate(
+        reconstructed,
         previous_result["target_level"],
     )
 
     reached = target_reached(
-        best_attempt.analysis,
+        best.analysis,
         previous_result["target_level"],
+    )
+
+    change_summary, notable_changes = _build_change_explanations(
+        previous_result["original_analysis"],
+        best.analysis,
     )
 
     return {
         **previous_result,
         "target_reached": reached,
-        "attempt_count": attempt_number,
-        "best_attempt_number": best_attempt.number,
-        "final_text": best_attempt.adapted_text,
-        "final_analysis": best_attempt.analysis,
-        "change_summary": best_attempt.change_summary,
-        "notable_changes": best_attempt.notable_changes,
-        "model": best_attempt.model,
-        "attempts": existing_attempts,
+        "attempt_count": generation,
+        "generation_count": generation,
+        "best_attempt_number": best.number,
+        "best_candidate_number": best.number,
+        "final_text": best.adapted_text,
+        "final_analysis": best.analysis,
+        "change_summary": change_summary,
+        "notable_changes": notable_changes,
+        "model": best.model,
+        "attempts": all_candidates,
     }
