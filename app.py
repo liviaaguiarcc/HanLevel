@@ -1910,8 +1910,9 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                     <div class="tutor-title">Ask HanLevel Tutor</div>
                     <div class="tutor-subtitle">
                         Ask about meaning, vocabulary, grammar, or how this
-                        Korean could be expressed differently. The tutor uses
-                        this text and HanLevel's analysis as context.
+                        Korean could be expressed differently. HanLevel Tutor
+                        keeps the conversation focused on the text and its
+                        analysis :)
                     </div>
                 </div>
             </div>
@@ -1980,11 +1981,20 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
     if st.session_state.tutor_history:
 
         st.markdown("#### Conversation")
+        st.caption(
+            "The conversation stays inside this box, so the page does not "
+            "keep getting longer. Scroll to review earlier messages."
+        )
 
-        for message in st.session_state.tutor_history:
+        with st.container(
+            height=360,
+            border=True,
+        ):
 
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+            for message in st.session_state.tutor_history:
+
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
 
     with st.form(
         "tutor_question_form",
@@ -2058,6 +2068,12 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                         "role": "assistant",
                         "content": tutor_result["answer"],
                     }
+                )
+
+                # Keep enough context for a useful conversation without
+                # allowing the session to grow indefinitely.
+                st.session_state.tutor_history = (
+                    st.session_state.tutor_history[-20:]
                 )
 
                 st.rerun()
