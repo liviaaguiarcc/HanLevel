@@ -1070,15 +1070,19 @@ if st.session_state.adaptation_result is not None:
         )
 
     if adaptation_result["target_reached"]:
-        attempt_count = adaptation_result["attempt_count"]
-        attempt_word = "attempt" if attempt_count == 1 else "attempts"
+        generation_count = adaptation_result.get("generation_count", 1)
+        generation_word = (
+            "generation" if generation_count == 1 else "generations"
+        )
 
         st.markdown(
             f"""
             <div class="status-success">
-                ✓ Target reached after {attempt_count} {attempt_word}.
-                HanLevel independently classified the adapted text as
-                {adapted_result['level']} ({adapted_result['final_score']:.1f}/100).
+                ✓ Target reached in {generation_count} {generation_word}.
+                HanLevel independently selected candidate
+                {adaptation_result.get('best_candidate_number', 1)}
+                as {adapted_result['level']}
+                ({adapted_result['final_score']:.1f}/100).
             </div>
             """,
             unsafe_allow_html=True,
@@ -1087,12 +1091,11 @@ if st.session_state.adaptation_result is not None:
         st.markdown(
             f"""
             <div class="status-warning">
-                Target not reached after
-                {adaptation_result['attempt_count']} attempts.
+                Target not reached in the current generation.
                 Requested: {adaptation_result['target_level']}.
-                Best result so far: {adapted_result['level']}
+                Best candidate so far: {adapted_result['level']}
                 ({adapted_result['final_score']:.1f}/100),
-                from attempt {adaptation_result.get('best_attempt_number', adaptation_result['attempt_count'])}.
+                candidate {adaptation_result.get('best_candidate_number', 1)}.
             </div>
             """,
             unsafe_allow_html=True,
@@ -1136,7 +1139,7 @@ if st.session_state.adaptation_result is not None:
 
     attempts = adaptation_result.get("attempts", [])
     if attempts:
-        with st.expander("See adaptation attempts"):
+        with st.expander("See generated candidates"):
             for attempt in attempts:
                 status = (
                     "✓ target"
@@ -1160,7 +1163,7 @@ if st.session_state.adaptation_result is not None:
                 )
 
                 st.write(
-                    f"**Attempt {attempt['number']}** {status} "
+                    f"**Candidate {attempt['number']}** {status} "
                     f"{attempt['level']} · {attempt['score']:.1f}/100 "
                     f"· {attempt.get('model', 'Gemini')}{latency_text}"
                 )
