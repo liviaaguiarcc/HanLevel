@@ -12,7 +12,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 VALID_LEVELS = {"Beginner", "Intermediate", "Advanced"}
 VALID_STYLES = {"Natural", "Casual", "Learning-friendly"}
@@ -210,11 +210,11 @@ def adapt_text(
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=0.35,
-            max_output_tokens=2500,
+            max_output_tokens=4096,
             response_mime_type="application/json",
             response_schema=AdaptationResponse,
             thinking_config=types.ThinkingConfig(
-                thinking_budget=0,
+                thinking_level="low",
             ),
         ),
     )
