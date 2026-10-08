@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+FALLBACK_MODELS = ("gemini-3.7-flash", "gemini-3.5-flash-lite")
 
 VALID_LEVELS = {"Beginner", "Intermediate", "Advanced"}
 VALID_STYLES = {"Natural", "Casual", "Learning-friendly"}
@@ -205,19 +206,54 @@ def adapt_text(
         feedback=feedback,
     )
 
-    response = client.models.generate_content(
-        model=selected_model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            temperature=0.35,
-            max_output_tokens=4096,
-            response_mime_type="application/json",
-            response_schema=AdaptationResponse,
-            thinking_config=types.ThinkingConfig(
-                thinking_level="low",
-            ),
-        ),
-    )
+    candidate_models = [selected_model]
+
+    # If Gemini 3.8 Flash is temporarily overloaded, keep the app usable by
+    # falling back to other current free-tier Flash models. Avoid duplicates
+    # when GEMINI_MODEL already points to one of the fallback models.
+    for fallback_model in FALLBACK_MODELS:
+        if fallback_model not in candidate_models:
+            candidate_models.append(fallback_model)
+
+    last_error = None
+    response = None
+    used_model = None
+
+    for candidate_model in candidate_models:
+        try:
+            response = client.models.generate_content(
+                model=candidate_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=4096,
+                    response_mime_type="application/json",
+                    response_schema=AdaptationResponse,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_level="low",
+                    ),
+                ),
+            )
+            used_model = candidate_model
+            break
+
+        except Exception as exc:
+            error_text = str(exc)
+            is_capacity_error = (
+                "503" in error_text
+                or "UNAVAILABLE" in error_text
+                or "high demand" in error_text.lower()
+            )
+
+            if not is_capacity_error:
+                raise
+
+            last_error = exc
+
+    if response is None:
+        raise RuntimeError(
+            "Gemini is temporarily unavailable across the configured "
+            "fallback models. Please try again shortly."
+        ) from last_error
 
     if not response.text:
         raise RuntimeError("Gemini returned an empty response.")
@@ -226,5 +262,5 @@ def adapt_text(
 
     return {
         **parsed.model_dump(),
-        "model": selected_model,
+        "model": used_model,
     }
