@@ -21,10 +21,91 @@ st.set_page_config(
 
 
 # =========================================================
+
+import re
+
+language = st.selectbox("Language / Idioma", ["English", "Português"], key="interface_language")
+
+TRANSLATIONS = {
+'Korean Readability Profiler':'Analisador de legibilidade do coreano',
+'Korean Readability Profiler · AI Tutor':'Analisador de legibilidade do coreano · Tutor de IA',
+'Know if a Korean text is right for your level':'Descubra se um texto em coreano é adequado ao seu nível',
+' — and understand why. ':' — e entenda o motivo. ',
+'HanLevel analyzes vocabulary, grammar, and sentence length to estimate how challenging a Korean text may be.':'O HanLevel analisa vocabulário, gramática e extensão das frases para estimar a dificuldade de um texto em coreano.',
+'Korean text':'Texto em coreano','Analyze difficulty':'Analisar dificuldade','Tell Lívia':'Fale com Lívia',
+'Please enter some Korean text first.':'Insira um texto em coreano primeiro.','Analyzing Korean text...':'Analisando o texto em coreano...',
+'Estimated difficulty':'Dificuldade estimada','Estimated level':'Nível estimado','HanLevel score:':'Pontuação HanLevel:',
+'Readability profile':'Perfil de legibilidade','Vocabulary difficulty':'Dificuldade do vocabulário','Grammar complexity':'Complexidade gramatical','Sentence length':'Extensão das frases','Vocabulary':'Vocabulário','Grammar':'Gramática',
+'Beginner':'Iniciante','Intermediate':'Intermediário','Advanced':'Avançado','Unclassified':'Não classificado',
+'Higher scores indicate greater estimated difficulty.':'Pontuações mais altas indicam maior dificuldade estimada.',
+'Contribution to HanLevel score':'Contribuição para a pontuação HanLevel',' points':' pontos',
+'Weighted contributions add up to the final HanLevel score.':'As contribuições ponderadas somam a pontuação final do HanLevel.',
+'See analysis details':'Ver detalhes da análise','Dictionary coverage:':'Cobertura do dicionário:',
+'Average eojeol per sentence:':'Média de eojeol por frase:','Vocabulary profile':'Perfil do vocabulário',
+'Potentially challenging vocabulary':'Vocabulário potencialmente desafiador','Detected structural markers':'Marcadores estruturais identificados',
+'Counts include repeated lexical items. The challenging-vocabulary list below shows each word only once.':'A contagem inclui itens lexicais repetidos. A lista abaixo apresenta cada palavra apenas uma vez.',
+'No intermediate or advanced vocabulary was identified in the graded dictionary entries.':'Não foi identificado vocabulário intermediário ou avançado nas entradas classificadas do dicionário.',
+'HanLevel detected ':'O HanLevel identificou ',' structural markers in total.':' marcadores estruturais no total.',
+'No weighted structural markers were detected.':'Não foram identificados marcadores estruturais ponderados.',
+'These markers are used by HanLevel\'s rule-based grammar-complexity component. They are structural indicators, not official learner-level grammar classifications.':'Esses marcadores são usados pelo componente de complexidade gramatical baseado em regras do HanLevel. São indicadores estruturais, não classificações oficiais de nível gramatical.',
+'How HanLevel calculates difficulty':'Como o HanLevel calcula a dificuldade',
+'Ask HanLevel Tutor':'Converse com o Tutor HanLevel','Suggested questions':'Perguntas sugeridas',
+'What does this text mean?':'O que este texto significa?','Explain the grammar':'Explique a gramática',
+'Which words are difficult?':'Quais palavras são difíceis?','Make it easier':'Simplifique o texto','Make it more advanced':'Torne o texto mais avançado',
+'Why is this ':'Por que este texto é ','Why ':'Por que ',
+'Conversation':'Conversa','Ask me anything about this text':'Pergunte sobre este texto',
+'e.g. Why is -는데 used here? Is there an easier word for this?':'Ex.: Por que -는데 aparece aqui? Existe uma palavra mais simples?',
+'Send':'Enviar','thinking...':'pensando...',
+'Pick a question above or type your own below. I\'ll stay focused on this text with you ^^':'Escolha uma pergunta acima ou escreva a sua abaixo. Vamos explorar este texto juntos ^^',
+'I couldn\'t finish that answer just now. Try me again in a moment? ^^':'Não consegui concluir a resposta agora. Tente novamente em instantes ^^',
+'Found something wrong with the tutor?':'Encontrou algum problema com o tutor?','let us know':'Avise a gente',
+'Hi ^^ I\'m the HanLevel Tutor.':'Oi ^^ Sou o Tutor HanLevel.',
+'This is my creator,':'Minha criadora é',
+'If I gave you an inaccurate explanation, hallucinated something,\n        or just acted a little weird, please tell her. It helps us make\n        this tutor better :)':'Se eu dei uma explicação incorreta, inventei alguma informação\n        ou me comportei de um jeito estranho, avise a ela. Isso nos ajuda\n        a melhorar o tutor :)',
+'Email Lívia:':'Envie um e-mail para Lívia:',
+'The private contact email has not been configured yet.':'O e-mail de contato ainda não foi configurado.',
+'Technical details':'Detalhes técnicos',
+'Ask about meaning, vocabulary, grammar, or how this\n                        Korean could be expressed differently. I\'m here to\n                        explore the text with you ^^':'Pergunte sobre o significado, o vocabulário, a gramática ou outras\n                        formas de expressar este texto em coreano. Vamos\n                        explorar o texto juntos ^^',
+'The readability analysis works without AI, but the tutor needs GEMINI_API_KEY configured in this deployment.':'A análise de legibilidade funciona sem IA, mas o tutor está indisponível nesta configuração.',
+'The text has ':'O texto apresenta ',' vocabulary difficulty, ':' dificuldade de vocabulário, ',
+' grammatical complexity, and ':' complexidade gramatical e ',' sentence-length difficulty. ':' dificuldade relacionada à extensão das frases. ',
+' contributes the most to the final score (+':' é o fator que mais contribui para a pontuação final (+',
+'Most classified lexical items are ':'A maioria dos itens lexicais classificados pertence ao nível ',
+' level. ':' . ','Sentences average ':'As frases têm, em média, ',' eojeol.':' eojeol.',
+'low':'baixa','moderate':'moderada','high':'alta','beginner':'iniciante','intermediate':'intermediário','advanced':'avançado',
+'Vocabulary coverage is limited, so the lexical estimate should be interpreted cautiously.':'A cobertura do vocabulário é limitada; interprete a estimativa lexical com cautela.',
+'Limited vocabulary coverage (':'Cobertura limitada do vocabulário (',
+'The difficulty estimate may be less reliable because many lexical items could not be assigned a learner level.':'A estimativa pode ser menos confiável porque muitos itens lexicais não puderam ser classificados por nível.',
+'Prefinal ending':'Terminação pré-final','Connective ending':'Terminação conectiva','Adnominal ending':'Terminação adnominal','Nominalizing ending':'Terminação nominalizadora','Auxiliary verb':'Verbo auxiliar','Quotation particle':'Partícula de citação','Structural marker':'Marcador estrutural',
+}
+
+TRANSLATIONS["\nHanLevel combines three interpretable indicators:\n\n**Vocabulary difficulty — 45%**\n\nVocabulary is matched against learner-level information from the Korean Learners' Dictionary (한국어기초사전).\n\nBeginner entries receive a lower difficulty value, while intermediate and advanced entries contribute progressively more to the vocabulary score. Unclassified items do not automatically count as difficult.\n\n**Grammar & morphology — 35%**\n\nKorean morphological analysis is performed with Kiwi. Selected structural markers and morphological density contribute to the grammar-complexity score.\n\nThe grammar score represents structural complexity. It should not be interpreted as an official grammar proficiency level.\n\n**Sentence length — 20%**\n\nAverage eojeol per sentence is used as an additional structural-complexity indicator.\n\n**Final classification**\n\nThe three components are combined into the HanLevel score.\n\nCurrent provisional thresholds are:\n\n- **Beginner:** below 25\n- **Intermediate:** 25 to below 50\n- **Advanced:** 50 and above\n\nThese thresholds were calibrated on a small internally constructed development set. They are not official TOPIK or CEFR boundaries.\n\nHanLevel v0.1 uses a rule-based model designed to make its difficulty estimate transparent and inspectable.\n"] = '\nO HanLevel combina três indicadores interpretáveis:\n\n**Dificuldade do vocabulário — 45%**\n\nO vocabulário é comparado com as informações de nível do Dicionário de Coreano para Aprendizes (한국어기초사전). Entradas iniciantes recebem valores menores, enquanto entradas intermediárias e avançadas contribuem progressivamente mais. Itens sem classificação não são automaticamente considerados difíceis.\n\n**Gramática e morfologia — 35%**\n\nA análise morfológica do coreano é realizada com o Kiwi. Marcadores estruturais selecionados e a densidade morfológica contribuem para a complexidade gramatical. Essa pontuação indica complexidade estrutural, não um nível oficial de proficiência gramatical.\n\n**Extensão das frases — 20%**\n\nA média de eojeol por frase é usada como um indicador adicional de complexidade estrutural.\n\n**Classificação final**\n\nOs três componentes são combinados na pontuação HanLevel. Os limites provisórios são:\n\n- **Iniciante:** abaixo de 25\n- **Intermediário:** de 25 a menos de 50\n- **Avançado:** 50 ou mais\n\nEsses limites foram calibrados em um pequeno conjunto interno de desenvolvimento. Não correspondem a limites oficiais do TOPIK ou do CEFR.\n\nO HanLevel utiliza um modelo baseado em regras para tornar sua estimativa de dificuldade transparente e verificável.\n'
+
+_translation_pattern = re.compile("|".join((r"\b" + re.escape(k) + r"\b") if k in {"low", "moderate", "high", "beginner", "intermediate", "advanced"} else re.escape(k) for k in sorted(TRANSLATIONS, key=len, reverse=True)))
+
+def tr(value):
+    if language != "Português" or not isinstance(value, str):
+        return value
+    return _translation_pattern.sub(lambda match: TRANSLATIONS[match.group(0)], value)
+
+class LocalizedUI:
+    """Translate presentation strings while preserving analyzer keys and AI output."""
+    def __getattr__(self, name):
+        method = getattr(st, name)
+        def render(*args, **kwargs):
+            args = tuple(tr(v) if isinstance(v, str) else v for v in args)
+            for key in ("label", "placeholder", "help"):
+                if key in kwargs:
+                    kwargs[key] = tr(kwargs[key])
+            return method(*args, **kwargs)
+        return render
+
+ui = LocalizedUI()
+
 # STYLING
 # =========================================================
 
-st.markdown(
+ui.markdown(
     """
 <style>
 
@@ -879,10 +960,10 @@ def get_contact_email():
         return None
 
 
-@st.dialog("Tell Lívia")
+@ui.dialog("Tell Lívia")
 def show_tutor_contact():
 
-    st.markdown(
+    ui.markdown(
         """
         <div class="tutor-dialog-pet-wrap">
             <div class="tutor-dialog-pet"><span class="tutor-expression"></span></div>
@@ -891,7 +972,7 @@ def show_tutor_contact():
         unsafe_allow_html=True,
     )
 
-    st.markdown(
+    ui.markdown(
         """
         **Hi ^^ I'm the HanLevel Tutor.**
 
@@ -907,13 +988,13 @@ def show_tutor_contact():
 
     if contact_email:
 
-        st.markdown(
+        ui.markdown(
             f"**Email Lívia:** [{contact_email}](mailto:{contact_email})"
         )
 
     else:
 
-        st.caption(
+        ui.caption(
             "The private contact email has not been configured yet."
         )
 
@@ -1450,7 +1531,7 @@ hero_html = (
 )
 
 
-st.markdown(
+ui.markdown(
     hero_html,
     unsafe_allow_html=True,
 )
@@ -1460,10 +1541,11 @@ st.markdown(
 # INPUT
 # =========================================================
 
-text = st.text_area(
+text = ui.text_area(
     "Korean text",
 
     height=180,
+    key="korean_source_input",
 
     placeholder=(
         "예: 오늘은 날씨가 정말 좋네요. "
@@ -1472,8 +1554,9 @@ text = st.text_area(
 )
 
 
-analyze_button = st.button(
+analyze_button = ui.button(
     "Analyze difficulty",
+    key="analyze_difficulty",
 
     type="primary",
 
@@ -1489,13 +1572,13 @@ if analyze_button:
 
     if not text.strip():
 
-        st.warning(
+        ui.warning(
             "Please enter some Korean text first."
         )
 
     else:
 
-        with st.spinner(
+        with ui.spinner(
             "Analyzing Korean text..."
         ):
 
@@ -1613,7 +1696,7 @@ if st.session_state.source_analysis is not None:
     # MAIN RESULT
     # =================================================
 
-    st.subheader(
+    ui.subheader(
         "Estimated difficulty"
     )
 
@@ -1639,7 +1722,7 @@ if st.session_state.source_analysis is not None:
     )
 
 
-    st.markdown(
+    ui.markdown(
         result_card_html,
         unsafe_allow_html=True,
     )
@@ -1700,7 +1783,7 @@ if st.session_state.source_analysis is not None:
     )
 
 
-    st.markdown(
+    ui.markdown(
         difficulty_html,
         unsafe_allow_html=True,
     )
@@ -1725,7 +1808,7 @@ if st.session_state.source_analysis is not None:
     )
 
 
-    st.markdown(
+    ui.markdown(
         explanation_html,
         unsafe_allow_html=True,
     )
@@ -1740,7 +1823,7 @@ if st.session_state.source_analysis is not None:
         < LOW_COVERAGE_THRESHOLD
     ):
 
-        st.warning(
+        ui.warning(
             f"Limited vocabulary coverage "
             f"({coverage:.1f}%). "
             "The difficulty estimate may be less reliable "
@@ -1753,7 +1836,7 @@ if st.session_state.source_analysis is not None:
     # READABILITY PROFILE
     # =================================================
 
-    st.subheader(
+    ui.subheader(
         "Readability profile"
     )
 
@@ -1765,7 +1848,7 @@ if st.session_state.source_analysis is not None:
 
     with col1:
 
-        st.metric(
+        ui.metric(
             "Vocabulary difficulty",
             f"{vocab_score:.1f}/100",
         )
@@ -1773,7 +1856,7 @@ if st.session_state.source_analysis is not None:
 
     with col2:
 
-        st.metric(
+        ui.metric(
             "Grammar complexity",
             f"{grammar_score:.1f}/100",
         )
@@ -1781,13 +1864,13 @@ if st.session_state.source_analysis is not None:
 
     with col3:
 
-        st.metric(
+        ui.metric(
             "Sentence length",
             f"{sentence_score:.1f}/100",
         )
 
 
-    st.caption(
+    ui.caption(
         "Higher scores indicate greater "
         "estimated difficulty."
     )
@@ -1797,7 +1880,7 @@ if st.session_state.source_analysis is not None:
     # CONTRIBUTION BREAKDOWN
     # =================================================
 
-    st.markdown(
+    ui.markdown(
         "#### Contribution to HanLevel score"
     )
 
@@ -1809,7 +1892,7 @@ if st.session_state.source_analysis is not None:
 
     with contribution_columns[0]:
 
-        st.metric(
+        ui.metric(
             "Vocabulary",
             (
                 f"+"
@@ -1821,7 +1904,7 @@ if st.session_state.source_analysis is not None:
 
     with contribution_columns[1]:
 
-        st.metric(
+        ui.metric(
             "Grammar",
             (
                 f"+"
@@ -1833,7 +1916,7 @@ if st.session_state.source_analysis is not None:
 
     with contribution_columns[2]:
 
-        st.metric(
+        ui.metric(
             "Sentence length",
             (
                 f"+"
@@ -1843,7 +1926,7 @@ if st.session_state.source_analysis is not None:
         )
 
 
-    st.caption(
+    ui.caption(
         "Weighted contributions add up "
         "to the final HanLevel score."
     )
@@ -1853,17 +1936,17 @@ if st.session_state.source_analysis is not None:
     # DETAILS
     # =================================================
 
-    with st.expander(
+    with ui.expander(
         "See analysis details"
     ):
 
-        st.write(
+        ui.write(
             f"**Dictionary coverage:** "
             f"{coverage:.1f}%"
         )
 
 
-        st.write(
+        ui.write(
             f"**Average eojeol per sentence:** "
             f"{average_eojeol:.1f}"
         )
@@ -1873,7 +1956,7 @@ if st.session_state.source_analysis is not None:
         # Vocabulary profile
         # ---------------------------------------------
 
-        st.markdown(
+        ui.markdown(
             "#### Vocabulary profile"
         )
 
@@ -1885,7 +1968,7 @@ if st.session_state.source_analysis is not None:
 
         with vocab_cols[0]:
 
-            st.metric(
+            ui.metric(
                 "Beginner",
                 vocabulary_profile[
                     "Beginner"
@@ -1895,7 +1978,7 @@ if st.session_state.source_analysis is not None:
 
         with vocab_cols[1]:
 
-            st.metric(
+            ui.metric(
                 "Intermediate",
                 vocabulary_profile[
                     "Intermediate"
@@ -1905,7 +1988,7 @@ if st.session_state.source_analysis is not None:
 
         with vocab_cols[2]:
 
-            st.metric(
+            ui.metric(
                 "Advanced",
                 vocabulary_profile[
                     "Advanced"
@@ -1915,7 +1998,7 @@ if st.session_state.source_analysis is not None:
 
         with vocab_cols[3]:
 
-            st.metric(
+            ui.metric(
                 "Unclassified",
                 vocabulary_profile[
                     "Unclassified"
@@ -1923,7 +2006,7 @@ if st.session_state.source_analysis is not None:
             )
 
 
-        st.caption(
+        ui.caption(
             "Counts include repeated lexical items. "
             "The challenging-vocabulary list below "
             "shows each word only once."
@@ -1936,7 +2019,7 @@ if st.session_state.source_analysis is not None:
 
         if difficult_words:
 
-            st.markdown(
+            ui.markdown(
                 "#### Potentially challenging vocabulary"
             )
 
@@ -1949,7 +2032,7 @@ if st.session_state.source_analysis is not None:
                     else "Advanced"
                 )
 
-                st.write(
+                ui.write(
                     f"- **{item['word']}** "
                     f"— {label}"
                 )
@@ -1957,7 +2040,7 @@ if st.session_state.source_analysis is not None:
 
         else:
 
-            st.write(
+            ui.write(
                 "No intermediate or advanced vocabulary "
                 "was identified in the graded "
                 "dictionary entries."
@@ -1968,12 +2051,12 @@ if st.session_state.source_analysis is not None:
         # Grammar structures
         # ---------------------------------------------
 
-        st.markdown(
+        ui.markdown(
             "#### Detected structural markers"
         )
 
 
-        st.write(
+        ui.write(
             f"HanLevel detected "
             f"**{len(result['grammar']['structures'])}** "
             f"structural markers in total."
@@ -1990,7 +2073,7 @@ if st.session_state.source_analysis is not None:
                     else ""
                 )
 
-                st.write(
+                ui.write(
                     f"- **{structure['form']}** "
                     f"— {structure['label']}"
                     f"{tag_text}"
@@ -1999,13 +2082,13 @@ if st.session_state.source_analysis is not None:
 
         else:
 
-            st.write(
+            ui.write(
                 "No weighted structural markers "
                 "were detected."
             )
 
 
-        st.caption(
+        ui.caption(
             "These markers are used by HanLevel's "
             "rule-based grammar-complexity component. "
             "They are structural indicators, not official "
@@ -2017,11 +2100,11 @@ if st.session_state.source_analysis is not None:
     # METHODOLOGY
     # =================================================
 
-    with st.expander(
+    with ui.expander(
         "How HanLevel calculates difficulty"
     ):
 
-        st.markdown(
+        ui.markdown(
             """
 HanLevel combines three interpretable indicators:
 
@@ -2063,9 +2146,9 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
     # =====================================================
 
     with st.container(key="hanlevel_tutor"):
-        st.markdown("---")
+        ui.markdown("---")
 
-        st.markdown(
+        ui.markdown(
             """
             <div class="tutor-shell">
                 <div class="tutor-header">
@@ -2087,7 +2170,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
         gemini_api_key = get_gemini_api_key()
 
         if gemini_api_key is None:
-            st.info(
+            ui.info(
                 "The readability analysis works without AI, but the tutor needs "
                 "GEMINI_API_KEY configured in this deployment."
             )
@@ -2124,7 +2207,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
             ),
         ]
 
-        st.caption("Suggested questions")
+        ui.caption("Suggested questions")
 
         question_cols = st.columns(2)
         selected_question = None
@@ -2133,7 +2216,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
             with question_cols[index % 2]:
 
-                if st.button(
+                if ui.button(
                     label,
                     key=f"tutor_suggestion_{index}",
                     use_container_width=True,
@@ -2184,7 +2267,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                 }
             )
 
-        st.markdown("#### Conversation")
+        ui.markdown("#### Conversation")
 
         chat_box = st.container(
             height=430,
@@ -2198,7 +2281,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
             )
 
             if not turns:
-                st.caption(
+                ui.caption(
                     "Pick a question above or type your own below. "
                     "I'll stay focused on this text with you ^^"
                 )
@@ -2230,28 +2313,28 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                         typing_placeholder = st.empty()
 
                         typing_placeholder.markdown(
-                            """
+                            tr("""
                             <div class="typing-indicator">
                                 <span class="typing-dot"></span>
                                 <span class="typing-dot"></span>
                                 <span class="typing-dot"></span>
                                 <span class="tutor-thinking-label">thinking...</span>
                             </div>
-                            """,
+                            """),
                             unsafe_allow_html=True,
                         )
 
                 if turn_index < len(turns) - 1:
                     st.divider()
 
-            st.markdown("---")
+            ui.markdown("---")
 
             with st.form(
                 "tutor_question_form",
                 clear_on_submit=True,
             ):
 
-                custom_question = st.text_input(
+                custom_question = ui.text_input(
                     "Ask me anything about this text",
                     placeholder=(
                         "e.g. Why is -는데 used here? "
@@ -2260,7 +2343,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                     disabled=(gemini_api_key is None),
                 )
 
-                ask_button = st.form_submit_button(
+                ask_button = ui.form_submit_button(
                     "Send",
                     use_container_width=True,
                     disabled=(gemini_api_key is None),
@@ -2280,7 +2363,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                 tutor_result = ask_tutor(
                     text=st.session_state.source_text,
                     analysis=st.session_state.source_analysis,
-                    question=pending_question,
+                    question=pending_question + ("\nPlease answer in Brazilian Portuguese." if language == "Português" else "\nPlease answer in English."),
                     history=prior_history,
                     api_key=gemini_api_key,
                 )
@@ -2301,10 +2384,10 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
                 if "typing_placeholder" in locals():
                     typing_placeholder.markdown(
-                        error_answer
+                        tr(error_answer)
                     )
 
-                with st.expander(
+                with ui.expander(
                     "Technical details"
                 ):
                     st.code(str(exc))
@@ -2329,7 +2412,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                 st.session_state.tutor_history[-20:]
             )
 
-        st.markdown("---")
+        ui.markdown("---")
 
         note_col, action_col = st.columns(
             [4.5, 1.5],
@@ -2337,16 +2420,17 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
         )
 
         with note_col:
-            st.caption(
+            ui.caption(
                 "Found something wrong with the tutor?"
             )
 
         with action_col:
-            if st.button(
+            if ui.button(
                 "let us know",
                 key="open_tutor_feedback",
                 type="tertiary",
                 use_container_width=False,
             ):
                 show_tutor_contact()
+
 
