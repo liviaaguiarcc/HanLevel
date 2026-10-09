@@ -15,7 +15,7 @@ from tutor_agent import ask_tutor
 
 st.set_page_config(
     page_title="HanLevel v1.0",
-    page_icon="🇰🇷",
+    page_icon=TUTOR_AVATAR,
     layout="centered",
 )
 
@@ -49,17 +49,17 @@ TRANSLATIONS = {
 'No weighted structural markers were detected.':'Não foram identificados marcadores estruturais ponderados.',
 'These markers are used by HanLevel\'s rule-based grammar-complexity component. They are structural indicators, not official learner-level grammar classifications.':'Esses marcadores são usados pelo componente de complexidade gramatical baseado em regras do HanLevel. São indicadores estruturais, não classificações oficiais de nível gramatical.',
 'How HanLevel calculates difficulty':'Como o HanLevel calcula a dificuldade',
-'Ask HanLevel Tutor':'Converse com o Tutor HanLevel','Suggested questions':'Perguntas sugeridas',
+'Ask Mongle (몽글)':'Converse com Mongle (몽글)','Suggested questions':'Perguntas sugeridas',
 'What does this text mean?':'O que este texto significa?','Explain the grammar':'Explique a gramática',
 'Which words are difficult?':'Quais palavras são difíceis?','Make it easier':'Simplifique o texto','Make it more advanced':'Torne o texto mais avançado',
 'Why is this ':'Por que este texto é ','Why ':'Por que ',
 'Conversation':'Conversa','Ask me anything about this text':'Pergunte sobre este texto',
 'e.g. Why is -는데 used here? Is there an easier word for this?':'Ex.: Por que -는데 aparece aqui? Existe uma palavra mais simples?',
 'Send':'Enviar','thinking...':'pensando...',
-'Pick a question above or type your own below. I\'ll stay focused on this text with you ^^':'Escolha uma pergunta acima ou escreva a sua abaixo. Vamos explorar este texto juntos ^^',
+'Hi ^^ I’m Mongle (몽글), your HanLevel Tutor. Pick a question above or type your own below. I\'ll stay focused on this text with you ^^':'Oi ^^ Sou Mongle (몽글), seu Tutor HanLevel. Escolha uma pergunta acima ou escreva a sua abaixo. Vamos explorar este texto juntos ^^',
 'I couldn\'t finish that answer just now. Try me again in a moment? ^^':'Não consegui concluir a resposta agora. Tente novamente em instantes ^^',
 'Found something wrong with the tutor?':'Encontrou algum problema com o tutor?','let us know':'Avise a gente',
-'Hi ^^ I\'m the HanLevel Tutor.':'Oi ^^ Sou o Tutor HanLevel.',
+'Hi ^^ I\'m the HanLevel Tutor.':'Oi ^^ Sou Mongle (몽글), seu Tutor HanLevel.',
 'This is my creator,':'Minha criadora é',
 'If I gave you an inaccurate explanation, hallucinated something,\n        or just acted a little weird, please tell her. It helps us make\n        this tutor better :)':'Se eu dei uma explicação incorreta, inventei alguma informação\n        ou me comportei de um jeito estranho, avise a ela. Isso nos ajuda\n        a melhorar o tutor :)',
 'Email Lívia:':'Envie um e-mail para Lívia:',
@@ -87,6 +87,9 @@ def tr(value):
     if language != "Português" or not isinstance(value, str):
         return value
     return _translation_pattern.sub(lambda match: TRANSLATIONS[match.group(0)], value)
+
+TRANSLATIONS["Hi ^^ I'm Mongle (몽글), your HanLevel Tutor."] = "Oi ^^ Sou Mongle (몽글), seu Tutor HanLevel."
+_translation_pattern = re.compile("|".join((r"\b" + re.escape(k) + r"\b") if k in {"low", "moderate", "high", "beginner", "intermediate", "advanced"} else re.escape(k) for k in sorted(TRANSLATIONS, key=len, reverse=True)))
 
 class LocalizedUI:
     """Translate presentation strings while preserving analyzer keys and AI output."""
@@ -974,7 +977,7 @@ def show_tutor_contact():
 
     ui.markdown(
         """
-        **Hi ^^ I'm the HanLevel Tutor.**
+        **Hi ^^ I'm Mongle (몽글), your HanLevel Tutor.**
 
         This is my creator, **Lívia**.
 
@@ -2154,7 +2157,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                 <div class="tutor-header">
                     <div class="tutor-pet"><span class="tutor-expression"></span></div>
                     <div>
-                        <div class="tutor-title">Ask HanLevel Tutor</div>
+                        <div class="tutor-title">Ask Mongle (몽글)</div>
                         <div class="tutor-subtitle">
                             Ask about meaning, vocabulary, grammar, or how this
                             Korean could be expressed differently. I'm here to
@@ -2282,7 +2285,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
             if not turns:
                 ui.caption(
-                    "Pick a question above or type your own below. "
+                    "Hi ^^ I’m Mongle (몽글), your HanLevel Tutor. Pick a question above or type your own below. "
                     "I'll stay focused on this text with you ^^"
                 )
 
