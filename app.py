@@ -994,6 +994,46 @@ hr {
     border-radius: 10px;
     background: rgba(255,255,255,.85);
 }
+
+/* Feedback is a small inline footer action, not a suggestion button. */
+.st-key-tutor_feedback [data-testid="stHorizontalBlock"] {
+    justify-content: center;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+}
+.st-key-tutor_feedback [data-testid="stColumn"] {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+}
+.st-key-tutor_feedback [data-testid="stCaptionContainer"] p {
+    margin: 0;
+    font-size: .8125rem;
+    line-height: 1.5;
+    color: #7a8498;
+}
+.st-key-tutor_feedback .stButton > button {
+    padding: 0 .15rem;
+    min-height: 1.5rem;
+    height: auto;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #7863bf;
+    box-shadow: none;
+}
+.st-key-tutor_feedback .stButton > button p {
+    font-size: .8125rem;
+    line-height: 1.5;
+    text-decoration: underline;
+}
+.st-key-tutor_feedback .stButton > button:hover {
+    background: transparent;
+    color: #59459d;
+    border: none;
+    transform: none;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -1060,12 +1100,13 @@ def get_contact_email():
 @ui.dialog("Tell Lívia")
 def show_tutor_contact():
 
-    ui.markdown(
-        """
-        <div class="tutor-dialog-pet-wrap">
-            <div class="tutor-dialog-pet"><span class="tutor-expression"></span></div>
-        </div>
-        """,
+    # Use the same self-contained image as the chat avatar. The dialog
+    # does not depend on page-level mascot CSS to display Mongle.
+    st.markdown(
+        f'<div style="display:flex;justify-content:center;padding:8px 0 20px;">'
+        f'<img src="{TUTOR_AVATAR}" alt="Mongle (몽글)" '
+        f'width="96" height="96" style="display:block;object-fit:contain;">'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
@@ -2532,24 +2573,25 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
         ui.markdown("---")
 
-        note_col, action_col = st.columns(
-            [4.5, 1.5],
-            vertical_alignment="center",
-        )
-
-        with note_col:
-            ui.caption(
-                "Found something wrong with the tutor?"
+        with st.container(key="tutor_feedback"):
+            note_col, action_col = st.columns(
+                [4.5, 1.5],
+                vertical_alignment="center",
             )
 
-        with action_col:
-            if ui.button(
-                "let us know",
-                key="open_tutor_feedback",
-                type="tertiary",
-                use_container_width=False,
-            ):
-                show_tutor_contact()
+            with note_col:
+                ui.caption(
+                    "Found something wrong with the tutor?"
+                )
+
+            with action_col:
+                if ui.button(
+                    "let us know",
+                    key="open_tutor_feedback",
+                    type="tertiary",
+                    use_container_width=False,
+                ):
+                    show_tutor_contact()
 
 
 
