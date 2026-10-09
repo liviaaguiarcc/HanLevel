@@ -24,7 +24,14 @@ st.set_page_config(
 
 import re
 
-language = st.selectbox("Language / Idioma", ["English", "Português"], key="interface_language")
+# Compact language control above the header, aligned to the right.
+with st.container(key="language_switch"):
+    language = st.selectbox(
+        "Language / Idioma",
+        ["English", "Português"],
+        key="interface_language",
+        label_visibility="collapsed",
+    )
 
 TRANSLATIONS = {
 'Korean Readability Profiler':'Analisador de legibilidade do coreano',
@@ -900,6 +907,27 @@ hr {
 .typing-indicator{display:flex;align-items:center;gap:.4rem;width:max-content;max-width:100%}
 .tutor-thinking-label{white-space:nowrap;word-break:normal;flex-shrink:0}
 @media(prefers-reduced-motion:reduce){.tutor-pet:before,.tutor-pet:after{animation:none}}
+
+/* Compact language menu in the top-right corner. */
+.st-key-language_switch {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: .5rem;
+}
+.st-key-language_switch > div {
+    width: 100%;
+}
+.st-key-language_switch [data-testid="stSelectbox"] {
+    width: 142px;
+    max-width: 100%;
+    margin-left: auto;
+}
+.st-key-language_switch [data-baseweb="select"] > div {
+    min-height: 34px;
+    font-size: .875rem;
+    border-radius: 10px;
+    background: rgba(255,255,255,.85);
+}
 </style>
 """,
     unsafe_allow_html=True,
