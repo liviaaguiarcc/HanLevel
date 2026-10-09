@@ -1,6 +1,9 @@
 import os
 
 import streamlit as st
+from urllib.parse import quote
+
+TUTOR_AVATAR = "data:image/svg+xml;utf8," + quote('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs><radialGradient id="b" cx=".3" cy=".2" r=".9"><stop stop-color="#b9a0f0"/><stop offset=".4" stop-color="#9675dd"/><stop offset="1" stop-color="#603a9e"/></radialGradient></defs><path d="M7 42C5 29 13 12 29 10C47 8 58 22 57 39C58 49 49 53 33 53C16 53 8 51 7 42Z" fill="url(#b)" stroke="#6842a6" stroke-width="2"/><ellipse cx="23" cy="31" rx="4" ry="6" fill="#fff9ff"/><ellipse cx="42" cy="31" rx="4" ry="6" fill="#fff9ff"/><path d="M29 42Q33 46 37 42" fill="none" stroke="#4e297f" stroke-width="2" stroke-linecap="round"/></svg>')
 
 from analyzer import analyze_text
 from tutor_agent import ask_tutor
@@ -795,6 +798,24 @@ hr {
     margin-top: 0.4rem;
 }
 
+/* Refined original blob: softly sculpted silhouette, bright eyes, quiet expression. */
+.tutor-pet,.tutor-dialog-pet{width:56px;height:48px;border-radius:48% 52% 36% 38% / 60% 58% 36% 35%;background:radial-gradient(ellipse at 28% 18%,#b9a0f0 0%,#9675dd 24%,#7951bd 65%,#603a9e 100%);border:2px solid #6842a6;box-shadow:inset 0 3px 1px #d2bbff70,inset 0 -5px 0 #4b287f25,0 5px 0 -2px #4d307d22;transform:rotate(-3deg)}
+.tutor-pet:before,.tutor-pet:after{top:17px;width:8px;height:11px;background:#fff9ff;border-radius:50%;box-shadow:0 1px 0 #45217155;animation:blob-blink 7s infinite}
+.tutor-pet:before{left:15px}.tutor-pet:after{right:13px}
+.tutor-pet .tutor-expression{position:absolute;left:25px;top:30px;width:7px;height:4px;border:solid #4e297f;border-width:0 0 2px;border-radius:0 0 60% 60%}
+.tutor-pet .tutor-expression:before,.tutor-pet .tutor-expression:after{content:'';position:absolute;top:-6px;width:7px;height:3px;border-radius:50%;background:#efb7db60}
+.tutor-pet .tutor-expression:before{left:-15px}.tutor-pet .tutor-expression:after{left:12px}
+@keyframes blob-blink{0%,43%,47%,100%{transform:scaleY(1)}45%{transform:scaleY(.12)}}
+.tutor-dialog-pet{width:84px;height:72px;margin:8px auto 24px;box-shadow:inset 0 4px 1px #d2bbff70,inset 0 -7px 0 #4b287f25,0 7px 0 -2px #4d307d22}
+.tutor-dialog-pet:before,.tutor-dialog-pet:after{top:25px;width:11px;height:15px}.tutor-dialog-pet:before{left:24px}.tutor-dialog-pet:after{right:22px}.tutor-dialog-pet .tutor-expression{left:38px;top:44px;width:9px;height:5px}.tutor-dialog-pet .tutor-expression:before{left:-22px;width:10px}.tutor-dialog-pet .tutor-expression:after{left:19px;width:10px}
+
+.tutor-dialog-pet{width:56px;height:48px;transform:scale(1.4) rotate(-3deg);margin:20px auto}
+.st-key-hanlevel_tutor .stButton > button{background:#faf9ff;color:#615388;border:1px solid #e0dbef;border-radius:22px;height:auto;min-height:2.7rem;font-size:.875rem}
+.st-key-hanlevel_tutor .stButton > button:hover{background:#eee8fc;transform:none}
+.st-key-hanlevel_tutor [data-testid="stChatMessage"]{background:#f7f6fc;border-radius:16px}
+.typing-indicator{display:flex;align-items:center;gap:.4rem;width:max-content;max-width:100%}
+.tutor-thinking-label{white-space:nowrap;word-break:normal;flex-shrink:0}
+@media(prefers-reduced-motion:reduce){.tutor-pet:before,.tutor-pet:after{animation:none}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -858,13 +879,13 @@ def get_contact_email():
         return None
 
 
-@st.dialog("Tell Livia")
+@st.dialog("Tell Lívia")
 def show_tutor_contact():
 
     st.markdown(
         """
         <div class="tutor-dialog-pet-wrap">
-            <div class="tutor-dialog-pet"></div>
+            <div class="tutor-dialog-pet"><span class="tutor-expression"></span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -874,7 +895,7 @@ def show_tutor_contact():
         """
         **Hi ^^ I'm the HanLevel Tutor.**
 
-        This is my creator, **Livia**.
+        This is my creator, **Lívia**.
 
         If I gave you an inaccurate explanation, hallucinated something,
         or just acted a little weird, please tell her. It helps us make
@@ -887,7 +908,7 @@ def show_tutor_contact():
     if contact_email:
 
         st.markdown(
-            f"**Email Livia:** [{contact_email}](mailto:{contact_email})"
+            f"**Email Lívia:** [{contact_email}](mailto:{contact_email})"
         )
 
     else:
@@ -2041,288 +2062,291 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
     # AI TUTOR
     # =====================================================
 
-    st.markdown("---")
+    with st.container(key="hanlevel_tutor"):
+        st.markdown("---")
 
-    st.markdown(
-        """
-        <div class="tutor-shell">
-            <div class="tutor-header">
-                <div class="tutor-pet"></div>
-                <div>
-                    <div class="tutor-title">Ask HanLevel Tutor</div>
-                    <div class="tutor-subtitle">
-                        Ask about meaning, vocabulary, grammar, or how this
-                        Korean could be expressed differently. I'm here to
-                        explore the text with you ^^
+        st.markdown(
+            """
+            <div class="tutor-shell">
+                <div class="tutor-header">
+                    <div class="tutor-pet"><span class="tutor-expression"></span></div>
+                    <div>
+                        <div class="tutor-title">Ask HanLevel Tutor</div>
+                        <div class="tutor-subtitle">
+                            Ask about meaning, vocabulary, grammar, or how this
+                            Korean could be expressed differently. I'm here to
+                            explore the text with you ^^
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    gemini_api_key = get_gemini_api_key()
-
-    if gemini_api_key is None:
-        st.info(
-            "The readability analysis works without AI, but the tutor needs "
-            "GEMINI_API_KEY configured in this deployment."
+            """,
+            unsafe_allow_html=True,
         )
 
-    suggested_questions = [
-        (
-            "What does this text mean?",
-            "What does this text mean? Explain it clearly.",
-        ),
-        (
-            f"Why is this {result['level']}?",
-            "Why did we classify this text at this level? "
-            "Use the analysis to explain the main reasons.",
-        ),
-        (
-            "Explain the grammar",
-            "Explain the most important or difficult grammar in this text "
-            "and what it is doing here.",
-        ),
-        (
-            "Which words are difficult?",
-            "Which words in this text may be difficult for a learner, "
-            "and what do they mean in context?",
-        ),
-        (
-            "Make it easier",
-            "Show me one easier, natural way to express this text while "
-            "preserving its meaning. Then explain the main changes.",
-        ),
-        (
-            "Make it more advanced",
-            "Show me one more advanced, natural way to express this text "
-            "while preserving its meaning. Then explain the main changes.",
-        ),
-    ]
+        gemini_api_key = get_gemini_api_key()
 
-    st.caption("Suggested questions")
+        if gemini_api_key is None:
+            st.info(
+                "The readability analysis works without AI, but the tutor needs "
+                "GEMINI_API_KEY configured in this deployment."
+            )
 
-    question_cols = st.columns(2)
-    selected_question = None
+        suggested_questions = [
+            (
+                "What does this text mean?",
+                "What does this text mean? Explain it clearly.",
+            ),
+            (
+                f"Why is this {result['level']}?",
+                "Why did we classify this text at this level? "
+                "Use the analysis to explain the main reasons.",
+            ),
+            (
+                "Explain the grammar",
+                "Explain the most important or difficult grammar in this text "
+                "and what it is doing here.",
+            ),
+            (
+                "Which words are difficult?",
+                "Which words in this text may be difficult for a learner, "
+                "and what do they mean in context?",
+            ),
+            (
+                "Make it easier",
+                "Show me one easier, natural way to express this text while "
+                "preserving its meaning. Then explain the main changes.",
+            ),
+            (
+                "Make it more advanced",
+                "Show me one more advanced, natural way to express this text "
+                "while preserving its meaning. Then explain the main changes.",
+            ),
+        ]
 
-    for index, (label, question) in enumerate(suggested_questions):
+        st.caption("Suggested questions")
 
-        with question_cols[index % 2]:
+        question_cols = st.columns(2)
+        selected_question = None
 
-            if st.button(
-                label,
-                key=f"tutor_suggestion_{index}",
-                use_container_width=True,
-                disabled=(gemini_api_key is None),
-            ):
-                selected_question = question
+        for index, (label, question) in enumerate(suggested_questions):
 
-    if "pending_tutor_question" not in st.session_state:
-        st.session_state.pending_tutor_question = None
+            with question_cols[index % 2]:
 
-    def build_turns(history):
+                if st.button(
+                    label,
+                    key=f"tutor_suggestion_{index}",
+                    use_container_width=True,
+                    disabled=(gemini_api_key is None),
+                ):
+                    selected_question = question
 
-        turns = []
-        current_turn = []
+        if "pending_tutor_question" not in st.session_state:
+            st.session_state.pending_tutor_question = None
 
-        for message in history:
+        def build_turns(history):
 
-            if (
-                message["role"] == "user"
-                and current_turn
-            ):
+            turns = []
+            current_turn = []
+
+            for message in history:
+
+                if (
+                    message["role"] == "user"
+                    and current_turn
+                ):
+                    turns.append(current_turn)
+                    current_turn = []
+
+                current_turn.append(message)
+
+            if current_turn:
                 turns.append(current_turn)
-                current_turn = []
 
-            current_turn.append(message)
+            return turns
 
-        if current_turn:
-            turns.append(current_turn)
+        if selected_question:
+            st.session_state.pending_tutor_question = selected_question
 
-        return turns
-
-    if selected_question:
-        st.session_state.pending_tutor_question = selected_question
-
-    pending_question = st.session_state.pending_tutor_question
-    prior_history = list(
-        st.session_state.tutor_history
-    )
-
-    if pending_question:
-
-        st.session_state.pending_tutor_question = None
-
-        st.session_state.tutor_history.append(
-            {
-                "role": "user",
-                "content": pending_question,
-            }
-        )
-
-    st.markdown("#### Conversation")
-
-    chat_box = st.container(
-        height=430,
-        border=True,
-    )
-
-    with chat_box:
-
-        turns = build_turns(
+        pending_question = st.session_state.pending_tutor_question
+        prior_history = list(
             st.session_state.tutor_history
         )
 
-        if not turns:
-            st.caption(
-                "Pick a question above or type your own below. "
-                "I'll stay focused on this text with you ^^"
+        if pending_question:
+
+            st.session_state.pending_tutor_question = None
+
+            st.session_state.tutor_history.append(
+                {
+                    "role": "user",
+                    "content": pending_question,
+                }
             )
 
-        for turn_index, turn in enumerate(
-            reversed(turns)
-        ):
+        st.markdown("#### Conversation")
 
-            for message in turn:
+        chat_box = st.container(
+            height=430,
+            border=True,
+        )
 
-                with st.chat_message(
-                    message["role"]
-                ):
-                    st.markdown(
-                        message["content"]
-                    )
+        with chat_box:
 
-            if (
-                pending_question
-                and turn_index == 0
-                and turn[-1]["role"] == "user"
+            turns = build_turns(
+                st.session_state.tutor_history
+            )
+
+            if not turns:
+                st.caption(
+                    "Pick a question above or type your own below. "
+                    "I'll stay focused on this text with you ^^"
+                )
+
+            for turn_index, turn in enumerate(
+                turns
             ):
 
-                with st.chat_message(
-                    "assistant"
+                for message in turn:
+
+                    with st.chat_message(
+                        message["role"],
+                        avatar=TUTOR_AVATAR if message["role"] == "assistant" else None,
+                    ):
+                        st.markdown(
+                            message["content"]
+                        )
+
+                if (
+                    pending_question
+                    and turn_index == len(turns) - 1
+                    and turn[-1]["role"] == "user"
                 ):
 
-                    typing_placeholder = st.empty()
+                    with st.chat_message(
+                        "assistant", avatar=TUTOR_AVATAR,
+                    ):
 
+                        typing_placeholder = st.empty()
+
+                        typing_placeholder.markdown(
+                            """
+                            <div class="typing-indicator">
+                                <span class="typing-dot"></span>
+                                <span class="typing-dot"></span>
+                                <span class="typing-dot"></span>
+                                <span class="tutor-thinking-label">thinking...</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                if turn_index < len(turns) - 1:
+                    st.divider()
+
+            st.markdown("---")
+
+            with st.form(
+                "tutor_question_form",
+                clear_on_submit=True,
+            ):
+
+                custom_question = st.text_input(
+                    "Ask me anything about this text",
+                    placeholder=(
+                        "e.g. Why is -는데 used here? "
+                        "Is there an easier word for this?"
+                    ),
+                    disabled=(gemini_api_key is None),
+                )
+
+                ask_button = st.form_submit_button(
+                    "Send",
+                    use_container_width=True,
+                    disabled=(gemini_api_key is None),
+                )
+
+            if ask_button and custom_question.strip():
+
+                st.session_state.pending_tutor_question = (
+                    custom_question.strip()
+                )
+
+                st.rerun()
+
+        if pending_question:
+
+            try:
+                tutor_result = ask_tutor(
+                    text=st.session_state.source_text,
+                    analysis=st.session_state.source_analysis,
+                    question=pending_question,
+                    history=prior_history,
+                    api_key=gemini_api_key,
+                )
+
+            except Exception as exc:
+
+                error_answer = (
+                    "I couldn't finish that answer just now. "
+                    "Try me again in a moment? ^^"
+                )
+
+                st.session_state.tutor_history.append(
+                    {
+                        "role": "assistant",
+                        "content": error_answer,
+                    }
+                )
+
+                if "typing_placeholder" in locals():
                     typing_placeholder.markdown(
-                        """
-                        <div class="typing-indicator">
-                            <span class="typing-dot"></span>
-                            <span class="typing-dot"></span>
-                            <span class="typing-dot"></span>
-                            <span class="tutor-thinking-label">thinking...</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
+                        error_answer
                     )
 
-            if turn_index < len(turns) - 1:
-                st.divider()
+                with st.expander(
+                    "Technical details"
+                ):
+                    st.code(str(exc))
+
+            else:
+
+                answer = tutor_result["answer"]
+
+                st.session_state.tutor_history.append(
+                    {
+                        "role": "assistant",
+                        "content": answer,
+                    }
+                )
+
+                if "typing_placeholder" in locals():
+                    typing_placeholder.markdown(
+                        answer
+                    )
+
+            st.session_state.tutor_history = (
+                st.session_state.tutor_history[-20:]
+            )
 
         st.markdown("---")
 
-        with st.form(
-            "tutor_question_form",
-            clear_on_submit=True,
-        ):
+        note_col, action_col = st.columns(
+            [4.5, 1.5],
+            vertical_alignment="center",
+        )
 
-            custom_question = st.text_input(
-                "Ask me anything about this text",
-                placeholder=(
-                    "e.g. Why is -는데 used here? "
-                    "Is there an easier word for this?"
-                ),
-                disabled=(gemini_api_key is None),
+        with note_col:
+            st.caption(
+                "Found something wrong with the tutor?"
             )
 
-            ask_button = st.form_submit_button(
-                "Send",
-                use_container_width=True,
-                disabled=(gemini_api_key is None),
-            )
-
-        if ask_button and custom_question.strip():
-
-            st.session_state.pending_tutor_question = (
-                custom_question.strip()
-            )
-
-            st.rerun()
-
-    if pending_question:
-
-        try:
-            tutor_result = ask_tutor(
-                text=st.session_state.source_text,
-                analysis=st.session_state.source_analysis,
-                question=pending_question,
-                history=prior_history,
-                api_key=gemini_api_key,
-            )
-
-        except Exception as exc:
-
-            error_answer = (
-                "I couldn't finish that answer just now. "
-                "Try me again in a moment? ^^"
-            )
-
-            st.session_state.tutor_history.append(
-                {
-                    "role": "assistant",
-                    "content": error_answer,
-                }
-            )
-
-            if "typing_placeholder" in locals():
-                typing_placeholder.markdown(
-                    error_answer
-                )
-
-            with st.expander(
-                "Technical details"
+        with action_col:
+            if st.button(
+                "let us know",
+                key="open_tutor_feedback",
+                type="tertiary",
+                use_container_width=False,
             ):
-                st.code(str(exc))
+                show_tutor_contact()
 
-        else:
-
-            answer = tutor_result["answer"]
-
-            st.session_state.tutor_history.append(
-                {
-                    "role": "assistant",
-                    "content": answer,
-                }
-            )
-
-            if "typing_placeholder" in locals():
-                typing_placeholder.markdown(
-                    answer
-                )
-
-        st.session_state.tutor_history = (
-            st.session_state.tutor_history[-20:]
-        )
-
-    st.markdown("---")
-
-    note_col, action_col = st.columns(
-        [4.5, 1.5],
-        vertical_alignment="center",
-    )
-
-    with note_col:
-        st.caption(
-            "Found something wrong with the tutor?"
-        )
-
-    with action_col:
-        if st.button(
-            "let us know",
-            key="open_tutor_feedback",
-            type="tertiary",
-            use_container_width=False,
-        ):
-            show_tutor_contact()
