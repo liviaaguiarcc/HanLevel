@@ -5,3 +5,6 @@ __pycache__/
 krdict_cache.json
 # Original KRDICT exports — too large for deployment
 data/krdict_*_5000.json
+
+# Local Streamlit secrets
+.streamlit/secrets.toml
