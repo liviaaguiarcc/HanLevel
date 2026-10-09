@@ -28,7 +28,7 @@ import re
 with st.container(key="language_switch"):
     language = st.selectbox(
         "Language / Idioma",
-        ["English", "Português"],
+        ["English", "Português", "Español"],
         key="interface_language",
         label_visibility="collapsed",
     )
@@ -97,6 +97,72 @@ def tr(value):
 
 TRANSLATIONS["Hi ^^ I'm Mongle (몽글), your HanLevel Tutor."] = "Oi ^^ Sou Mongle (몽글), seu Tutor HanLevel."
 _translation_pattern = re.compile("|".join((r"\b" + re.escape(k) + r"\b") if k in {"low", "moderate", "high", "beginner", "intermediate", "advanced"} else re.escape(k) for k in sorted(TRANSLATIONS, key=len, reverse=True)))
+
+SPANISH_TRANSLATIONS = {
+'Korean Readability Profiler':'Analizador de legibilidad del coreano',
+'Korean Readability Profiler · AI Tutor':'Analizador de legibilidad del coreano · Tutor de IA',
+'Know if a Korean text is right for your level':'Descubre si un texto en coreano es adecuado para tu nivel',
+' — and understand why. ':' — y entiende por qué. ',
+'HanLevel analyzes vocabulary, grammar, and sentence length to estimate how challenging a Korean text may be.':'HanLevel analiza el vocabulario, la gramática y la longitud de las oraciones para estimar la dificultad de un texto en coreano.',
+'Korean text':'Texto en coreano','Analyze difficulty':'Analizar dificultad','Tell Lívia':'Cuéntale a Lívia',
+'Please enter some Korean text first.':'Primero escribe un texto en coreano.','Analyzing Korean text...':'Analizando el texto en coreano...',
+'Estimated difficulty':'Dificultad estimada','Estimated level':'Nivel estimado','HanLevel score:':'Puntuación HanLevel:',
+'Readability profile':'Perfil de legibilidad','Vocabulary difficulty':'Dificultad del vocabulario','Grammar complexity':'Complejidad gramatical','Sentence length':'Longitud de las oraciones','Vocabulary':'Vocabulario','Grammar':'Gramática',
+'Beginner':'Principiante','Intermediate':'Intermedio','Advanced':'Avanzado','Unclassified':'Sin clasificar',
+'Higher scores indicate greater estimated difficulty.':'Las puntuaciones más altas indican mayor dificultad estimada.',
+'Contribution to HanLevel score':'Contribución a la puntuación HanLevel',' points':' puntos',
+'Weighted contributions add up to the final HanLevel score.':'Las contribuciones ponderadas suman la puntuación final de HanLevel.',
+'See analysis details':'Ver detalles del análisis','Dictionary coverage:':'Cobertura del diccionario:',
+'Average eojeol per sentence:':'Promedio de eojeol por oración:','Vocabulary profile':'Perfil del vocabulario',
+'Potentially challenging vocabulary':'Vocabulario potencialmente difícil','Detected structural markers':'Marcadores estructurales identificados',
+'Counts include repeated lexical items. The challenging-vocabulary list below shows each word only once.':'El recuento incluye elementos léxicos repetidos. La lista siguiente muestra cada palabra una sola vez.',
+'No intermediate or advanced vocabulary was identified in the graded dictionary entries.':'No se identificó vocabulario intermedio o avanzado en las entradas clasificadas del diccionario.',
+'HanLevel detected ':'HanLevel identificó ',' structural markers in total.':' marcadores estructurales en total.',
+'No weighted structural markers were detected.':'No se identificaron marcadores estructurales ponderados.',
+'These markers are used by HanLevel\'s rule-based grammar-complexity component. They are structural indicators, not official learner-level grammar classifications.':'Estos marcadores se utilizan en el componente de complejidad gramatical basado en reglas de HanLevel. Son indicadores estructurales, no clasificaciones oficiales del nivel gramatical.',
+'How HanLevel calculates difficulty':'Cómo calcula HanLevel la dificultad',
+'Ask Mongle (몽글)':'Habla con Mongle (몽글)','Suggested questions':'Preguntas sugeridas',
+'What does this text mean?':'¿Qué significa este texto?','Explain the grammar':'Explica la gramática',
+'Which words are difficult?':'¿Qué palabras son difíciles?','Make it easier':'Simplifica el texto','Make it more advanced':'Haz el texto más avanzado',
+'Why is this ':'¿Por qué este texto es ','Why ':'¿Por qué ',
+'Conversation':'Conversación','Ask me anything about this text':'Pregunta sobre este texto',
+'e.g. Why is -는데 used here? Is there an easier word for this?':'Ej.: ¿Por qué se usa -는데 aquí? ¿Hay una palabra más sencilla?',
+'Send':'Enviar','thinking...':'pensando...',
+'Hi ^^ I’m Mongle (몽글), your HanLevel Tutor. Pick a question above or type your own below. I\'ll stay focused on this text with you ^^':'Hola ^^ Soy Mongle (몽글), tu Tutor HanLevel. Elige una pregunta arriba o escribe la tuya abajo. Exploremos este texto juntos ^^',
+'I couldn\'t finish that answer just now. Try me again in a moment? ^^':'No pude terminar la respuesta. ¿Puedes intentarlo de nuevo en un momento? ^^',
+'Found something wrong with the tutor?':'¿Encontraste algún problema con el tutor?','let us know':'Avísanos',
+'Hi ^^ I\'m the HanLevel Tutor.':'Hola ^^ Soy Mongle (몽글), tu Tutor HanLevel.',
+'Hi ^^ I\'m Mongle (몽글), your HanLevel Tutor.':'Hola ^^ Soy Mongle (몽글), tu Tutor HanLevel.',
+'This is my creator,':'Mi creadora es',
+'If I gave you an inaccurate explanation, hallucinated something,\n        or just acted a little weird, please tell her. It helps us make\n        this tutor better :)':'Si di una explicación incorrecta, inventé alguna información\n        o me comporté de forma extraña, avísale. Nos ayuda a\n        mejorar este tutor :)',
+'Email Lívia:':'Escríbele a Lívia:',
+'The private contact email has not been configured yet.':'El correo de contacto todavía no está configurado.',
+'Technical details':'Detalles técnicos',
+'Ask about meaning, vocabulary, grammar, or how this\n                        Korean could be expressed differently. I\'m here to\n                        explore the text with you ^^':'Pregunta sobre el significado, el vocabulario, la gramática u otras\n                        formas de expresar este texto en coreano. Vamos a\n                        explorar el texto juntos ^^',
+'The readability analysis works without AI, but the tutor needs GEMINI_API_KEY configured in this deployment.':'El análisis de legibilidad funciona sin IA, pero el tutor no está disponible con esta configuración.',
+'The text has ':'El texto presenta ',' vocabulary difficulty, ':' dificultad de vocabulario, ',
+' grammatical complexity, and ':' complejidad gramatical y ',' sentence-length difficulty. ':' dificultad relacionada con la longitud de las oraciones. ',
+' contributes the most to the final score (+':' es el factor que más contribuye a la puntuación final (+',
+'Most classified lexical items are ':'La mayoría de los elementos léxicos clasificados pertenecen al nivel ',
+' level. ':' . ','Sentences average ':'Las oraciones tienen un promedio de ',' eojeol.':' eojeol.',
+'low':'baja','moderate':'moderada','high':'alta','beginner':'principiante','intermediate':'intermedio','advanced':'avanzado',
+'Vocabulary coverage is limited, so the lexical estimate should be interpreted cautiously.':'La cobertura del vocabulario es limitada; interpreta la estimación léxica con cautela.',
+'Limited vocabulary coverage (':'Cobertura limitada del vocabulario (',
+'The difficulty estimate may be less reliable because many lexical items could not be assigned a learner level.':'La estimación puede ser menos fiable porque no se pudo asignar un nivel a muchos elementos léxicos.',
+'Prefinal ending':'Terminación prefinal','Connective ending':'Terminación conectiva','Adnominal ending':'Terminación adnominal','Nominalizing ending':'Terminación nominalizadora','Auxiliary verb':'Verbo auxiliar','Quotation particle':'Partícula de cita','Structural marker':'Marcador estructural',
+}
+
+SPANISH_TRANSLATIONS["\nHanLevel combines three interpretable indicators:\n\n**Vocabulary difficulty — 45%**\n\nVocabulary is matched against learner-level information from the Korean Learners' Dictionary (한국어기초사전).\n\nBeginner entries receive a lower difficulty value, while intermediate and advanced entries contribute progressively more to the vocabulary score. Unclassified items do not automatically count as difficult.\n\n**Grammar & morphology — 35%**\n\nKorean morphological analysis is performed with Kiwi. Selected structural markers and morphological density contribute to the grammar-complexity score.\n\nThe grammar score represents structural complexity. It should not be interpreted as an official grammar proficiency level.\n\n**Sentence length — 20%**\n\nAverage eojeol per sentence is used as an additional structural-complexity indicator.\n\n**Final classification**\n\nThe three components are combined into the HanLevel score.\n\nCurrent provisional thresholds are:\n\n- **Beginner:** below 25\n- **Intermediate:** 25 to below 50\n- **Advanced:** 50 and above\n\nThese thresholds were calibrated on a small internally constructed development set. They are not official TOPIK or CEFR boundaries.\n\nHanLevel v0.1 uses a rule-based model designed to make its difficulty estimate transparent and inspectable.\n"] = '\nHanLevel combina tres indicadores interpretables:\n\n**Dificultad del vocabulario — 45%**\n\nEl vocabulario se compara con los niveles del Diccionario de Coreano para Aprendices (한국어기초사전). Las entradas de nivel principiante reciben valores menores; las de nivel intermedio y avanzado contribuyen progresivamente más. Los elementos sin clasificar no se consideran difíciles automáticamente.\n\n**Gramática y morfología — 35%**\n\nKiwi realiza el análisis morfológico del coreano. Los marcadores estructurales seleccionados y la densidad morfológica contribuyen a la complejidad gramatical. Esta puntuación representa complejidad estructural, no un nivel oficial de competencia gramatical.\n\n**Longitud de las oraciones — 20%**\n\nEl promedio de eojeol por oración se usa como indicador adicional de complejidad estructural.\n\n**Clasificación final**\n\nLos tres componentes se combinan en la puntuación HanLevel. Los límites provisionales son:\n\n- **Principiante:** menos de 25\n- **Intermedio:** de 25 a menos de 50\n- **Avanzado:** 50 o más\n\nEstos límites se calibraron con un pequeño conjunto interno de desarrollo. No son límites oficiales de TOPIK ni del MCER.\n\nHanLevel utiliza un modelo basado en reglas para que su estimación de dificultad sea transparente y verificable.\n'
+
+_translation_patterns = {}
+for _locale, _dictionary in {"Português": TRANSLATIONS, "Español": SPANISH_TRANSLATIONS}.items():
+    _translation_patterns[_locale] = re.compile("|".join((r"\b" + re.escape(k) + r"\b") if k in {"low", "moderate", "high", "beginner", "intermediate", "advanced"} else re.escape(k) for k in sorted(_dictionary, key=len, reverse=True)))
+
+def tr(value):
+    if not isinstance(value, str) or language == "English":
+        return value
+    dictionary = SPANISH_TRANSLATIONS if language == "Español" else TRANSLATIONS
+    return _translation_patterns[language].sub(lambda match: dictionary[match.group(0)], value)
 
 class LocalizedUI:
     """Translate presentation strings while preserving analyzer keys and AI output."""
@@ -2394,7 +2460,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                 tutor_result = ask_tutor(
                     text=st.session_state.source_text,
                     analysis=st.session_state.source_analysis,
-                    question=pending_question + ("\nPlease answer in Brazilian Portuguese." if language == "Português" else "\nPlease answer in English."),
+                    question=pending_question + ("\nPlease answer in Brazilian Portuguese." if language == "Português" else "\nPlease answer in Spanish." if language == "Español" else "\nPlease answer in English."),
                     history=prior_history,
                     api_key=gemini_api_key,
                 )
@@ -2463,5 +2529,6 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                 use_container_width=False,
             ):
                 show_tutor_contact()
+
 
 
