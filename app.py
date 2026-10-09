@@ -2308,6 +2308,7 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
         question_cols = st.columns(2)
         selected_question = None
+        selected_question_display = None
 
         for index, (label, question) in enumerate(suggested_questions):
 
@@ -2319,10 +2320,16 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
                     use_container_width=True,
                     disabled=(gemini_api_key is None),
                 ):
+                    # Keep the detailed English prompt for the tutor, but show
+                    # the user the localized button text in the chat bubble.
                     selected_question = question
+                    selected_question_display = tr(label)
 
         if "pending_tutor_question" not in st.session_state:
             st.session_state.pending_tutor_question = None
+
+        if "pending_tutor_display" not in st.session_state:
+            st.session_state.pending_tutor_display = None
 
         def build_turns(history):
 
@@ -2347,8 +2354,16 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
         if selected_question:
             st.session_state.pending_tutor_question = selected_question
+            st.session_state.pending_tutor_display = (
+                selected_question_display
+            )
 
         pending_question = st.session_state.pending_tutor_question
+        pending_display = (
+            st.session_state.pending_tutor_display
+            or pending_question
+        )
+
         prior_history = list(
             st.session_state.tutor_history
         )
@@ -2356,11 +2371,12 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
         if pending_question:
 
             st.session_state.pending_tutor_question = None
+            st.session_state.pending_tutor_display = None
 
             st.session_state.tutor_history.append(
                 {
                     "role": "user",
-                    "content": pending_question,
+                    "content": pending_display,
                 }
             )
 
@@ -2448,8 +2464,13 @@ HanLevel v0.1 uses a rule-based model designed to make its difficulty estimate t
 
             if ask_button and custom_question.strip():
 
+                custom_text = custom_question.strip()
+
                 st.session_state.pending_tutor_question = (
-                    custom_question.strip()
+                    custom_text
+                )
+                st.session_state.pending_tutor_display = (
+                    custom_text
                 )
 
                 st.rerun()
